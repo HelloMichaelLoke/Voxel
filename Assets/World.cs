@@ -39,7 +39,12 @@ public class World : MonoBehaviour
     private SunLightJob sunLightJob;
     private JobHandle sunLightJobHandle;
     private bool sunLightJobDone = true;
-    
+
+    // Job for generating sun lights
+    private SunLightJob tempSunLightJob;
+    private JobHandle tempSunLightJobHandle;
+    private bool tempSunLightJobDone = true;
+
     // Job for generating the mesh
     private MeshTerrainJob meshTerrainJob;
     private JobHandle meshTerrainJobHandle;
@@ -73,11 +78,9 @@ public class World : MonoBehaviour
 
     private void Update()
     {
-        this.startStopwatch();
-
         if (Input.GetMouseButtonDown(0))
         {
-            this.WorldEditHeighten(locator.position, 20);
+            this.WorldEditDraw(locator.position, -127, 1);
         }
 
         if (Input.GetMouseButtonDown(1))
@@ -101,8 +104,6 @@ public class World : MonoBehaviour
         */
 
         this.UpdatePlayerChunkPositionLast();
-
-        this.stopStopwatch("Update: ", 30);
     }
 
     private void OnApplicationQuit()
@@ -150,6 +151,29 @@ public class World : MonoBehaviour
             Chunk chunk02 = this.chunks[chunkPosition + new Vector2Int(-1, 1)];
             Chunk chunk12 = this.chunks[chunkPosition + new Vector2Int(0, 1)];
             Chunk chunk22 = this.chunks[chunkPosition + new Vector2Int(1, 1)];
+
+            // Update Sun Light
+
+            this.startStopwatch();
+            this.tempSunLightJob.chunkPosition = new int2(chunkPosition.x, chunkPosition.y);
+            this.tempSunLightJob.chunk00densities.CopyFrom(this.chunks[chunkPosition + new Vector2Int(-1, -1)].GetDensities());
+            this.tempSunLightJob.chunk10densities.CopyFrom(this.chunks[chunkPosition + new Vector2Int(0, -1)].GetDensities());
+            this.tempSunLightJob.chunk20densities.CopyFrom(this.chunks[chunkPosition + new Vector2Int(1, -1)].GetDensities());
+            this.tempSunLightJob.chunk01densities.CopyFrom(this.chunks[chunkPosition + new Vector2Int(-1, 0)].GetDensities());
+            this.tempSunLightJob.chunk11densities.CopyFrom(this.chunks[chunkPosition + new Vector2Int(0, 0)].GetDensities());
+            this.tempSunLightJob.chunk21densities.CopyFrom(this.chunks[chunkPosition + new Vector2Int(1, 0)].GetDensities());
+            this.tempSunLightJob.chunk02densities.CopyFrom(this.chunks[chunkPosition + new Vector2Int(-1, 1)].GetDensities());
+            this.tempSunLightJob.chunk12densities.CopyFrom(this.chunks[chunkPosition + new Vector2Int(0, 1)].GetDensities());
+            this.tempSunLightJob.chunk22densities.CopyFrom(this.chunks[chunkPosition + new Vector2Int(1, 1)].GetDensities());
+            this.tempSunLightJobHandle = this.tempSunLightJob.Schedule();
+
+            this.tempSunLightJobHandle.Complete();
+            this.tempSunLightJobDone = true;
+            this.chunks[chunkPosition].SetSunLightsFromNative(this.tempSunLightJob.sunLights);
+            this.chunks[chunkPosition].areLightsDone = true;
+            this.stopStopwatch("sunLightUpdate", 0);
+
+            // End Update Sun Light
 
             this.worldEditMeshJob.vertices.Clear();
             this.worldEditMeshJob.normals.Clear();
@@ -204,7 +228,6 @@ public class World : MonoBehaviour
 
             GameObject chunkGameObject = this.chunkGameObjects[chunkPosition];
 
-            this.startStopwatch();
             Mesh mesh = chunkGameObject.GetComponent<MeshFilter>().mesh;
             mesh.Clear();
             mesh.SetVertices(this.worldEditMeshJob.vertices.AsArray());
@@ -216,7 +239,6 @@ public class World : MonoBehaviour
             mesh.SetUVs(3, this.worldEditMeshJob.mats5678.AsArray());
             mesh.SetUVs(4, this.worldEditMeshJob.lights.AsArray());
             mesh.RecalculateBounds();
-            this.stopStopwatch("worldEdit Update Mesh: ", 6);
 
             chunkGameObject.GetComponent<MeshCollider>().sharedMesh = mesh;
         }
@@ -373,10 +395,8 @@ public class World : MonoBehaviour
             this.generateTerrainJobHandle.Complete();
             this.generateTerrainJobDone = true;
             Chunk chunk = new Chunk();
-            this.startStopwatch();
             chunk.SetDensitiesFromNative(this.generateTerrainJob.densities);
             chunk.SetMaterialsFromNative(this.generateTerrainJob.materials);
-            this.stopStopwatch("SetFromNative GenerateTerrainJob", 4);
             chunk.areDensitiesDone = true;
             Vector2Int chunkPosition = new Vector2Int(this.generateTerrainJob.chunkCoordinate.x, this.generateTerrainJob.chunkCoordinate.y);
             this.chunks.Add(chunkPosition, chunk);
@@ -438,9 +458,8 @@ public class World : MonoBehaviour
             this.sunLightJobHandle.Complete();
             this.sunLightJobDone = true;
             Vector2Int chunkPosition = new Vector2Int(this.sunLightJob.chunkPosition.x, this.sunLightJob.chunkPosition.y);
-            this.chunks[chunkPosition].SetSunLightsFromNative(this.sunLightJob.lightVoxels);
+            this.chunks[chunkPosition].SetSunLightsFromNative(this.sunLightJob.sunLights);
             this.chunks[chunkPosition].areLightsDone = true;
-            
 
             if (Mathf.Abs(chunkPosition.x - this.playerChunkPosition.x) <= this.chunkDistance && Mathf.Abs(chunkPosition.y - this.playerChunkPosition.y) <= this.chunkDistance)
             {
@@ -567,7 +586,6 @@ public class World : MonoBehaviour
             Mesh mesh = new Mesh();
             mesh.name = "Chunk Mesh";
             mesh.indexFormat = UnityEngine.Rendering.IndexFormat.UInt32;
-            this.startStopwatch();
             mesh.SetVertices(this.meshTerrainJob.vertices.AsArray());
             mesh.SetNormals(this.meshTerrainJob.normals.AsArray());
             mesh.SetIndices(this.meshTerrainJob.indices.AsArray(), MeshTopology.Triangles, 0);
@@ -577,7 +595,6 @@ public class World : MonoBehaviour
             mesh.SetUVs(3, this.meshTerrainJob.mats5678.AsArray());
             mesh.SetUVs(4, this.meshTerrainJob.lights.AsArray());
             mesh.RecalculateBounds();
-            this.stopStopwatch("meshTerrainJob", 10);
 
             chunkGameObject.GetComponent<MeshFilter>().sharedMesh = mesh;
             chunkGameObject.GetComponent<MeshRenderer>().material = this.terrainMaterial;
@@ -628,8 +645,7 @@ public class World : MonoBehaviour
         this.generateTerrainJob.materials = new NativeArray<byte>(65536, Allocator.Persistent);
 
         // Light Job
-        this.sunLightJob.chunkSize = new int3(16, 256, 16);
-        this.sunLightJob.lightVoxels = new NativeArray<byte>(65536, Allocator.Persistent);
+        this.sunLightJob.sunLights = new NativeArray<byte>(65536, Allocator.Persistent);
         this.sunLightJob.lightQueue = new NativeQueue<int3>(Allocator.Persistent);
         this.sunLightJob.densities = new NativeArray<sbyte>(589824, Allocator.Persistent);
         this.sunLightJob.lights = new NativeArray<int>(589824, Allocator.Persistent);
@@ -642,6 +658,21 @@ public class World : MonoBehaviour
         this.sunLightJob.chunk02densities = new NativeArray<sbyte>(65536, Allocator.Persistent);
         this.sunLightJob.chunk12densities = new NativeArray<sbyte>(65536, Allocator.Persistent);
         this.sunLightJob.chunk22densities = new NativeArray<sbyte>(65536, Allocator.Persistent);
+
+        // Light Job
+        this.tempSunLightJob.sunLights = new NativeArray<byte>(65536, Allocator.Persistent);
+        this.tempSunLightJob.lightQueue = new NativeQueue<int3>(Allocator.Persistent);
+        this.tempSunLightJob.densities = new NativeArray<sbyte>(589824, Allocator.Persistent);
+        this.tempSunLightJob.lights = new NativeArray<int>(589824, Allocator.Persistent);
+        this.tempSunLightJob.chunk00densities = new NativeArray<sbyte>(65536, Allocator.Persistent);
+        this.tempSunLightJob.chunk10densities = new NativeArray<sbyte>(65536, Allocator.Persistent);
+        this.tempSunLightJob.chunk20densities = new NativeArray<sbyte>(65536, Allocator.Persistent);
+        this.tempSunLightJob.chunk01densities = new NativeArray<sbyte>(65536, Allocator.Persistent);
+        this.tempSunLightJob.chunk11densities = new NativeArray<sbyte>(65536, Allocator.Persistent);
+        this.tempSunLightJob.chunk21densities = new NativeArray<sbyte>(65536, Allocator.Persistent);
+        this.tempSunLightJob.chunk02densities = new NativeArray<sbyte>(65536, Allocator.Persistent);
+        this.tempSunLightJob.chunk12densities = new NativeArray<sbyte>(65536, Allocator.Persistent);
+        this.tempSunLightJob.chunk22densities = new NativeArray<sbyte>(65536, Allocator.Persistent);
 
         // Mesh Job
         this.meshTerrainJob = new MeshTerrainJob()
@@ -790,7 +821,7 @@ public class World : MonoBehaviour
         this.generateTerrainJob.heights.Dispose();
         this.generateTerrainJob.materials.Dispose();
 
-        this.sunLightJob.lightVoxels.Dispose();
+        this.sunLightJob.sunLights.Dispose();
         this.sunLightJob.lightQueue.Dispose();
         this.sunLightJob.densities.Dispose();
         this.sunLightJob.lights.Dispose();
@@ -803,6 +834,20 @@ public class World : MonoBehaviour
         this.sunLightJob.chunk02densities.Dispose();
         this.sunLightJob.chunk12densities.Dispose();
         this.sunLightJob.chunk22densities.Dispose();
+
+        this.tempSunLightJob.sunLights.Dispose();
+        this.tempSunLightJob.lightQueue.Dispose();
+        this.tempSunLightJob.densities.Dispose();
+        this.tempSunLightJob.lights.Dispose();
+        this.tempSunLightJob.chunk00densities.Dispose();
+        this.tempSunLightJob.chunk10densities.Dispose();
+        this.tempSunLightJob.chunk20densities.Dispose();
+        this.tempSunLightJob.chunk01densities.Dispose();
+        this.tempSunLightJob.chunk11densities.Dispose();
+        this.tempSunLightJob.chunk21densities.Dispose();
+        this.tempSunLightJob.chunk02densities.Dispose();
+        this.tempSunLightJob.chunk12densities.Dispose();
+        this.tempSunLightJob.chunk22densities.Dispose();
 
         this.meshTerrainJob.chunkDensities.Dispose();
         this.meshTerrainJob.chunkMaterials.Dispose();

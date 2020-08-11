@@ -77,7 +77,99 @@ public struct MeshTerrainJob : IJob
     public void Execute()
     {
         this.MergeChunks();
+        this.MeshCells();
+    }
 
+    private void MergeChunks()
+    {
+        int index = 0;
+        sbyte density = 0;
+        byte material = 0;
+        byte light = 0;
+        int arrayPosition = 0;
+
+        for (int y = 0; y <= 255; y++)
+        {
+            for (int z = 0; z <= 18; z++)
+            {
+                for (int x = 0; x <= 18; x++)
+                {
+                    if (x == 0 && z == 0)
+                    {
+                        arrayPosition = 255 + y * 256;
+                        density = chunk00densities[arrayPosition];
+                        material = chunk00materials[arrayPosition];
+                        light = chunk00lights[arrayPosition];
+                    }
+                    else if (x == 0 && z >= 1 && z <= 16)
+                    {
+                        arrayPosition = 15 + ((z - 1) * 16) + y * 256;
+                        density = chunk01densities[arrayPosition];
+                        material = chunk01materials[arrayPosition];
+                        light = chunk01lights[arrayPosition];
+                    }
+                    else if (x == 0 && z >= 17)
+                    {
+                        arrayPosition = 15 + ((z - 17) * 16) + y * 256;
+                        density = chunk02densities[arrayPosition];
+                        material = chunk02materials[arrayPosition];
+                        light = chunk02lights[arrayPosition];
+                    }
+                    else if (x >= 1 && x <= 16 && z == 0)
+                    {
+                        arrayPosition = 240 + (x - 1) + y * 256;
+                        density = chunk10densities[arrayPosition];
+                        material = chunk10materials[arrayPosition];
+                        light = chunk10lights[arrayPosition];
+                    }
+                    else if (x >= 1 && x <= 16 && z >= 1 && z <= 16)
+                    {
+                        arrayPosition = 0 + (x - 1) + ((z - 1) * 16) + y * 256;
+                        density = chunk11densities[arrayPosition];
+                        material = chunk11materials[arrayPosition];
+                        light = chunk11lights[arrayPosition];
+                    }
+                    else if (x >= 1 && x <= 16 && z >= 17)
+                    {
+                        arrayPosition = 0 + (x - 1) + ((z - 17) * 16) + y * 256;
+                        density = chunk12densities[arrayPosition];
+                        material = chunk12materials[arrayPosition];
+                        light = chunk12lights[arrayPosition];
+                    }
+                    else if (x >= 17 && z == 0)
+                    {
+                        arrayPosition = 240 + (x - 17) + y * 256;
+                        density = chunk20densities[arrayPosition];
+                        material = chunk20materials[arrayPosition];
+                        light = chunk20lights[arrayPosition];
+                    }
+                    else if (x >= 17 && z >= 1 && z <= 16)
+                    {
+                        arrayPosition = 0 + (x - 17) + ((z - 1) * 16) + y * 256;
+                        density = chunk21densities[arrayPosition];
+                        material = chunk21materials[arrayPosition];
+                        light = chunk21lights[arrayPosition];
+                    }
+                    else if (x >= 17 && z >= 17)
+                    {
+                        arrayPosition = 0 + (x - 17) + ((z - 17) * 16) + y * 256;
+                        density = chunk22densities[arrayPosition];
+                        material = chunk22materials[arrayPosition];
+                        light = chunk22lights[arrayPosition];
+                    }
+
+                    chunkDensities[index] = density;
+                    chunkMaterials[index] = material;
+                    chunkLights[index] = light;
+
+                    index++;
+                }
+            }
+        }
+    }
+
+    private void MeshCells()
+    {
         for (int y = 1; y <= 253; y++)
         {
             for (int z = 1; z <= 16; z++)
@@ -195,6 +287,7 @@ public struct MeshTerrainJob : IJob
 
             float3 normal = weight0 * normal0 + weight1 * normal1;
             float sunLight = weight0 * sunLight0 + weight1 * sunLight1;
+
             float sourceLight = weight0 * sourceLight0 + weight1 * sourceLight1;
 
             float materialId;
@@ -242,35 +335,74 @@ public struct MeshTerrainJob : IJob
     {
         int sunLight = 0;
 
-        sunLight = math.max(sunLight, (int)((chunkLights[index + -381] >> 4) & 0xF));
-        sunLight = math.max(sunLight, (int)((chunkLights[index + -362] >> 4) & 0xF));
-        sunLight = math.max(sunLight, (int)((chunkLights[index + -343] >> 4) & 0xF));
-        sunLight = math.max(sunLight, (int)((chunkLights[index + -20] >> 4) & 0xF));
-        sunLight = math.max(sunLight, (int)((chunkLights[index + -1] >> 4) & 0xF));
+        sunLight = math.max(sunLight, (int)((chunkLights[index - 381] >> 4) & 0xF));
+        sunLight = math.max(sunLight, (int)((chunkLights[index - 362] >> 4) & 0xF));
+        sunLight = math.max(sunLight, (int)((chunkLights[index - 343] >> 4) & 0xF));
+        sunLight = math.max(sunLight, (int)((chunkLights[index - 20] >> 4) & 0xF));
+        sunLight = math.max(sunLight, (int)((chunkLights[index - 1] >> 4) & 0xF));
         sunLight = math.max(sunLight, (int)((chunkLights[index + 18] >> 4) & 0xF));
         sunLight = math.max(sunLight, (int)((chunkLights[index + 341] >> 4) & 0xF));
         sunLight = math.max(sunLight, (int)((chunkLights[index + 360] >> 4) & 0xF));
         sunLight = math.max(sunLight, (int)((chunkLights[index + 379] >> 4) & 0xF));
-        sunLight = math.max(sunLight, (int)((chunkLights[index + -380] >> 4) & 0xF));
-        sunLight = math.max(sunLight, (int)((chunkLights[index + -361] >> 4) & 0xF));
-        sunLight = math.max(sunLight, (int)((chunkLights[index + -342] >> 4) & 0xF));
-        sunLight = math.max(sunLight, (int)((chunkLights[index + -19] >> 4) & 0xF));
+        sunLight = math.max(sunLight, (int)((chunkLights[index - 380] >> 4) & 0xF));
+        sunLight = math.max(sunLight, (int)((chunkLights[index - 361] >> 4) & 0xF));
+        sunLight = math.max(sunLight, (int)((chunkLights[index - 342] >> 4) & 0xF));
+        sunLight = math.max(sunLight, (int)((chunkLights[index - 19] >> 4) & 0xF));
         sunLight = math.max(sunLight, (int)((chunkLights[index] >> 4) & 0xF));
         sunLight = math.max(sunLight, (int)((chunkLights[index + 19] >> 4) & 0xF));
         sunLight = math.max(sunLight, (int)((chunkLights[index + 342] >> 4) & 0xF));
         sunLight = math.max(sunLight, (int)((chunkLights[index + 361] >> 4) & 0xF));
         sunLight = math.max(sunLight, (int)((chunkLights[index + 380] >> 4) & 0xF));
-        sunLight = math.max(sunLight, (int)((chunkLights[index + -379] >> 4) & 0xF));
-        sunLight = math.max(sunLight, (int)((chunkLights[index + -360] >> 4) & 0xF));
-        sunLight = math.max(sunLight, (int)((chunkLights[index + -341] >> 4) & 0xF));
-        sunLight = math.max(sunLight, (int)((chunkLights[index + -18] >> 4) & 0xF));
+        sunLight = math.max(sunLight, (int)((chunkLights[index - 379] >> 4) & 0xF));
+        sunLight = math.max(sunLight, (int)((chunkLights[index - 360] >> 4) & 0xF));
+        sunLight = math.max(sunLight, (int)((chunkLights[index - 341] >> 4) & 0xF));
+        sunLight = math.max(sunLight, (int)((chunkLights[index - 18] >> 4) & 0xF));
         sunLight = math.max(sunLight, (int)((chunkLights[index + 1] >> 4) & 0xF));
         sunLight = math.max(sunLight, (int)((chunkLights[index + 20] >> 4) & 0xF));
         sunLight = math.max(sunLight, (int)((chunkLights[index + 343] >> 4) & 0xF));
         sunLight = math.max(sunLight, (int)((chunkLights[index + 362] >> 4) & 0xF));
         sunLight = math.max(sunLight, (int)((chunkLights[index + 381] >> 4) & 0xF));
 
-        return new float2((float)sunLight / 15.0f, 0.0f);
+        /*
+        sunLight = math.max(sunLight, (int)((chunkLights[index + 1] >> 4) & 0xF));
+        sunLight = math.max(sunLight, (int)((chunkLights[index - 1] >> 4) & 0xF));
+        sunLight = math.max(sunLight, (int)((chunkLights[index + 19] >> 4) & 0xF));
+        sunLight = math.max(sunLight, (int)((chunkLights[index - 19] >> 4) & 0xF));
+        sunLight = math.max(sunLight, (int)((chunkLights[index + 361] >> 4) & 0xF));
+        sunLight = math.max(sunLight, (int)((chunkLights[index - 361] >> 4) & 0xF));
+        */
+
+        int sourceLight = 0;
+
+        sourceLight = math.max(sourceLight, (int)(chunkLights[index - 381] & 0xF));
+        sourceLight = math.max(sourceLight, (int)(chunkLights[index - 362] & 0xF));
+        sourceLight = math.max(sourceLight, (int)(chunkLights[index - 343] & 0xF));
+        sourceLight = math.max(sourceLight, (int)(chunkLights[index - 20] & 0xF));
+        sourceLight = math.max(sourceLight, (int)(chunkLights[index - 1] & 0xF));
+        sourceLight = math.max(sourceLight, (int)(chunkLights[index + 18] & 0xF));
+        sourceLight = math.max(sourceLight, (int)(chunkLights[index + 341] & 0xF));
+        sourceLight = math.max(sourceLight, (int)(chunkLights[index + 360] & 0xF));
+        sourceLight = math.max(sourceLight, (int)(chunkLights[index + 379] & 0xF));
+        sourceLight = math.max(sourceLight, (int)(chunkLights[index - 380] & 0xF));
+        sourceLight = math.max(sourceLight, (int)(chunkLights[index - 361] & 0xF));
+        sourceLight = math.max(sourceLight, (int)(chunkLights[index - 342] & 0xF));
+        sourceLight = math.max(sourceLight, (int)(chunkLights[index - 19] & 0xF));
+        sourceLight = math.max(sourceLight, (int)(chunkLights[index] & 0xF));
+        sourceLight = math.max(sourceLight, (int)(chunkLights[index + 19] & 0xF));
+        sourceLight = math.max(sourceLight, (int)(chunkLights[index + 342] & 0xF));
+        sourceLight = math.max(sourceLight, (int)(chunkLights[index + 361] & 0xF));
+        sourceLight = math.max(sourceLight, (int)(chunkLights[index + 380] & 0xF));
+        sourceLight = math.max(sourceLight, (int)(chunkLights[index - 379] & 0xF));
+        sourceLight = math.max(sourceLight, (int)(chunkLights[index - 360] & 0xF));
+        sourceLight = math.max(sourceLight, (int)(chunkLights[index - 341] & 0xF));
+        sourceLight = math.max(sourceLight, (int)(chunkLights[index - 18] & 0xF));
+        sourceLight = math.max(sourceLight, (int)(chunkLights[index + 1] & 0xF));
+        sourceLight = math.max(sourceLight, (int)(chunkLights[index + 20] & 0xF));
+        sourceLight = math.max(sourceLight, (int)(chunkLights[index + 343] & 0xF));
+        sourceLight = math.max(sourceLight, (int)(chunkLights[index + 362] & 0xF));
+        sourceLight = math.max(sourceLight, (int)(chunkLights[index + 381] & 0xF));
+
+        return new float2((float)sunLight / 15.0f, (float)sourceLight / 15.0f);
     }
 
     private float3 GetNormal(int index)
@@ -305,93 +437,5 @@ public struct MeshTerrainJob : IJob
         normal += new float3(1.0f, 1.0f, 1.0f) * (float)chunkDensities[index + 381];
 
         return math.normalize(normal);
-    }
-
-    private void MergeChunks()
-    {
-        int index = 0;
-        sbyte density = 0;
-        byte material = 0;
-        byte light = 0;
-        int arrayPosition = 0;
-
-        for (int y = 0; y <= 255; y++)
-        {
-            for (int z = 0; z <= 18; z++)
-            {
-                for (int x = 0; x <= 18; x++)
-                {
-                    if (x == 0 && z == 0)
-                    {
-                        arrayPosition = 255 + y * 256;
-                        density = chunk00densities[arrayPosition];
-                        material = chunk00materials[arrayPosition];
-                        light = chunk00lights[arrayPosition];
-                    }
-                    else if (x == 0 && z >= 1 && z <= 16)
-                    {
-                        arrayPosition = 15 + ((z - 1) * 16) + y * 256;
-                        density = chunk01densities[arrayPosition];
-                        material = chunk01materials[arrayPosition];
-                        light = chunk01lights[arrayPosition];
-                    }
-                    else if (x == 0 && z >= 17)
-                    {
-                        arrayPosition = 15 + ((z - 17) * 16) + y * 256;
-                        density = chunk02densities[arrayPosition];
-                        material = chunk02materials[arrayPosition];
-                        light = chunk02lights[arrayPosition];
-                    }
-                    else if (x >= 1 && x <= 16 && z == 0)
-                    {
-                        arrayPosition = 240 + (x - 1) + y * 256;
-                        density = chunk10densities[arrayPosition];
-                        material = chunk10materials[arrayPosition];
-                        light = chunk10lights[arrayPosition];
-                    }
-                    else if (x >= 1 && x <= 16 && z >= 1 && z <= 16)
-                    {
-                        arrayPosition = 0 + (x - 1) + ((z - 1) * 16) + y * 256;
-                        density = chunk11densities[arrayPosition];
-                        material = chunk11materials[arrayPosition];
-                        light = chunk11lights[arrayPosition];
-                    }
-                    else if (x >= 1 && x <= 16 && z >= 17)
-                    {
-                        arrayPosition = 0 + (x - 1) + ((z - 17) * 16) + y * 256;
-                        density = chunk12densities[arrayPosition];
-                        material = chunk12materials[arrayPosition];
-                        light = chunk12lights[arrayPosition];
-                    }
-                    else if (x >= 17 && z == 0)
-                    {
-                        arrayPosition = 240 + (x - 17) + y * 256;
-                        density = chunk20densities[arrayPosition];
-                        material = chunk20materials[arrayPosition];
-                        light = chunk20lights[arrayPosition];
-                    }
-                    else if (x >= 17 && z >= 1 && z <= 16)
-                    {
-                        arrayPosition = 0 + (x - 17) + ((z - 1) * 16) + y * 256;
-                        density = chunk21densities[arrayPosition];
-                        material = chunk21materials[arrayPosition];
-                        light = chunk21lights[arrayPosition];
-                    }
-                    else if (x >= 17 && z >= 17)
-                    {
-                        arrayPosition = 0 + (x - 17) + ((z - 17) * 16) + y * 256;
-                        density = chunk22densities[arrayPosition];
-                        material = chunk22materials[arrayPosition];
-                        light = chunk22lights[arrayPosition];
-                    }
-
-                    chunkDensities[index] = density;
-                    chunkMaterials[index] = material;
-                    chunkLights[index] = light;
-
-                    index++;
-                }
-            }
-        }
     }
 }

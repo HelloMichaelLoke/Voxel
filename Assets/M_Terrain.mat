@@ -86,6 +86,7 @@ Material:
     - _SmoothnessTextureChannel: 0
     - _SpecularHighlights: 1
     - _SrcBlend: 1
+    - _SunLight: 1
     - _TexBrightness: 0.1
     - _TexScale: 1
     - _UVSec: 0

@@ -9,8 +9,10 @@ using Unity.Mathematics;
 [BurstCompile(CompileSynchronously = true)]
 public struct SunLightJob : IJob
 {
-    public NativeArray<byte> lightVoxels;
+    public NativeArray<byte> sunLights;
 
+    public NativeArray<sbyte> densities;
+    public NativeArray<int> lights;
     public NativeQueue<int3> lightQueue;
 
     public NativeArray<sbyte> chunk00densities;
@@ -24,10 +26,6 @@ public struct SunLightJob : IJob
     public NativeArray<sbyte> chunk22densities;
 
     public int2 chunkPosition;
-    public int3 chunkSize;
-
-    public NativeArray<sbyte> densities;
-    public NativeArray<int> lights;
 
     public void Execute()
     {
@@ -240,7 +238,7 @@ public struct SunLightJob : IJob
                 {
                     if (x >= 16 && x <= 31 && z >= 16 && z <= 31)
                     {
-                        this.lightVoxels[finalIndex] = (byte)lights[index];
+                        this.sunLights[finalIndex] = (byte)lights[index];
                         finalIndex++;
                     }
 

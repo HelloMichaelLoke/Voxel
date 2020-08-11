@@ -6,6 +6,7 @@
         _TexHeight("Texture Height", 2DArray) = "white" {}
         _TexScale("Scale", Float) = 1.0
         _TexBrightness("Brightness", Range(0.0, 1.0)) = 0.1
+        _SunLight("Sun Light", Range(0.0, 1.0)) = 1.0
     }
         SubShader
         {
@@ -23,6 +24,7 @@
 
                 float _TexScale;
                 float _TexBrightness;
+                float _SunLight;
 
                 struct appdata
                 {
@@ -233,8 +235,10 @@
                             albedo = lerp(albedo2, albedo, blend);
                         }
                     }*/
+
+                    float light = max(i.light.x * _SunLight, i.light.y);
                     
-                    float3 color = (_TexBrightness + (1.0 - _TexBrightness) * i.light.x) * albedo;
+                    float3 color = (_TexBrightness + (1.0 - _TexBrightness) * light) * albedo;
 
                     return float4(color.x, color.y, color.z, 1.0);
                 }
