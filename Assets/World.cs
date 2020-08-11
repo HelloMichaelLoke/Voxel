@@ -57,7 +57,11 @@ public class World : MonoBehaviour
     Queue<Vector2Int> generateLightsQueue = new Queue<Vector2Int>();
     Queue<Vector2Int> generateMeshQueue = new Queue<Vector2Int>();
 
-    System.Diagnostics.Stopwatch stopwatch = new System.Diagnostics.Stopwatch();
+    // Diagnostics
+    private System.Diagnostics.Stopwatch stopwatch = new System.Diagnostics.Stopwatch();
+
+    private bool worldEditQueueEmpty = true;
+    private System.Diagnostics.Stopwatch worldEditStopwatch = new System.Diagnostics.Stopwatch();
 
     private void Start()
     {
@@ -73,7 +77,7 @@ public class World : MonoBehaviour
 
         if (Input.GetMouseButtonDown(0))
         {
-            this.WorldEditHeighten(locator.position, 1);
+            this.WorldEditHeighten(locator.position, 20);
         }
 
         if (Input.GetMouseButtonDown(1))
@@ -98,12 +102,30 @@ public class World : MonoBehaviour
 
         this.UpdatePlayerChunkPositionLast();
 
-        this.stopStopwatch("Update", 5);
+        this.stopStopwatch("Update: ", 30);
+    }
+
+    private void OnApplicationQuit()
+    {
+        this.DisposeJobs();
     }
 
     private void UpdateWorldEdit()
     {
-        if (worldEditMeshJobDone && this.worldEditMeshQueue.Count > 0)
+        if (this.worldEditQueueEmpty && this.worldEditMeshQueue.Count > 0)
+        {
+            this.worldEditQueueEmpty = false;
+            this.worldEditStopwatch.Reset();
+            this.worldEditStopwatch.Start();
+        }
+        else if (!this.worldEditQueueEmpty && this.worldEditMeshQueue.Count == 0)
+        {
+            this.worldEditQueueEmpty = true;
+            this.worldEditStopwatch.Stop();
+            Debug.Log("worldEdit took: " + this.worldEditStopwatch.ElapsedMilliseconds + "ms");
+        }
+
+        if (this.worldEditMeshJobDone && this.worldEditMeshQueue.Count > 0)
         {
             Vector2Int chunkPosition = this.worldEditMeshQueue.Dequeue();
 
@@ -194,7 +216,7 @@ public class World : MonoBehaviour
             mesh.SetUVs(3, this.worldEditMeshJob.mats5678.AsArray());
             mesh.SetUVs(4, this.worldEditMeshJob.lights.AsArray());
             mesh.RecalculateBounds();
-            this.stopStopwatch("worldEditMeshJob", 6);
+            this.stopStopwatch("worldEdit Update Mesh: ", 6);
 
             chunkGameObject.GetComponent<MeshCollider>().sharedMesh = mesh;
         }
@@ -567,134 +589,6 @@ public class World : MonoBehaviour
         }
     }
 
-    private void OnApplicationQuit()
-    {
-        if (!this.generateTerrainJobDone) this.generateTerrainJobHandle.Complete();
-        if (!this.sunLightJobDone) this.sunLightJobHandle.Complete();
-        if (!this.meshTerrainJobDone) this.meshTerrainJobHandle.Complete();
-        if (!this.worldEditMeshJobDone) this.worldEditMeshJobHandle.Complete();
-
-        this.generateTerrainJob.densities.Dispose();
-        this.generateTerrainJob.heights.Dispose();
-        this.generateTerrainJob.materials.Dispose();
-
-        this.sunLightJob.lightVoxels.Dispose();
-        this.sunLightJob.lightQueue.Dispose();
-        this.sunLightJob.densities.Dispose();
-        this.sunLightJob.lights.Dispose();
-        this.sunLightJob.chunk00densities.Dispose();
-        this.sunLightJob.chunk10densities.Dispose();
-        this.sunLightJob.chunk20densities.Dispose();
-        this.sunLightJob.chunk01densities.Dispose();
-        this.sunLightJob.chunk11densities.Dispose();
-        this.sunLightJob.chunk21densities.Dispose();
-        this.sunLightJob.chunk02densities.Dispose();
-        this.sunLightJob.chunk12densities.Dispose();
-        this.sunLightJob.chunk22densities.Dispose();
-
-        this.meshTerrainJob.chunkDensities.Dispose();
-        this.meshTerrainJob.chunkMaterials.Dispose();
-        this.meshTerrainJob.chunkLights.Dispose();
-        this.meshTerrainJob.mcCornerPositions.Dispose();
-        this.meshTerrainJob.mcCellClasses.Dispose();
-        this.meshTerrainJob.mcCellGeometryCounts.Dispose();
-        this.meshTerrainJob.mcCellIndices.Dispose();
-        this.meshTerrainJob.mcCellVertexData.Dispose();
-        this.meshTerrainJob.vertices.Dispose();
-        this.meshTerrainJob.normals.Dispose();
-        this.meshTerrainJob.indices.Dispose();
-        this.meshTerrainJob.lights.Dispose();
-        this.meshTerrainJob.mats1234.Dispose();
-        this.meshTerrainJob.mats5678.Dispose();
-        this.meshTerrainJob.weights1234.Dispose();
-        this.meshTerrainJob.weights5678.Dispose();
-        this.meshTerrainJob.cornerPositions.Dispose();
-        this.meshTerrainJob.cornerDensities.Dispose();
-        this.meshTerrainJob.cornerMaterials.Dispose();
-        this.meshTerrainJob.cornerNormals.Dispose();
-        this.meshTerrainJob.cornerLightVoxels.Dispose();
-        this.meshTerrainJob.cellIndices.Dispose();
-        this.meshTerrainJob.mappedIndices.Dispose();
-        this.meshTerrainJob.chunk00densities.Dispose();
-        this.meshTerrainJob.chunk00materials.Dispose();
-        this.meshTerrainJob.chunk00lights.Dispose();
-        this.meshTerrainJob.chunk10densities.Dispose();
-        this.meshTerrainJob.chunk10materials.Dispose();
-        this.meshTerrainJob.chunk10lights.Dispose();
-        this.meshTerrainJob.chunk20densities.Dispose();
-        this.meshTerrainJob.chunk20materials.Dispose();
-        this.meshTerrainJob.chunk20lights.Dispose();
-        this.meshTerrainJob.chunk01densities.Dispose();
-        this.meshTerrainJob.chunk01materials.Dispose();
-        this.meshTerrainJob.chunk01lights.Dispose();
-        this.meshTerrainJob.chunk11densities.Dispose();
-        this.meshTerrainJob.chunk11materials.Dispose();
-        this.meshTerrainJob.chunk11lights.Dispose();
-        this.meshTerrainJob.chunk21densities.Dispose();
-        this.meshTerrainJob.chunk21materials.Dispose();
-        this.meshTerrainJob.chunk21lights.Dispose();
-        this.meshTerrainJob.chunk02densities.Dispose();
-        this.meshTerrainJob.chunk02materials.Dispose();
-        this.meshTerrainJob.chunk02lights.Dispose();
-        this.meshTerrainJob.chunk12densities.Dispose();
-        this.meshTerrainJob.chunk12materials.Dispose();
-        this.meshTerrainJob.chunk12lights.Dispose();
-        this.meshTerrainJob.chunk22densities.Dispose();
-        this.meshTerrainJob.chunk22materials.Dispose();
-        this.meshTerrainJob.chunk22lights.Dispose();
-
-        this.worldEditMeshJob.chunkDensities.Dispose();
-        this.worldEditMeshJob.chunkMaterials.Dispose();
-        this.worldEditMeshJob.chunkLights.Dispose();
-        this.worldEditMeshJob.mcCornerPositions.Dispose();
-        this.worldEditMeshJob.mcCellClasses.Dispose();
-        this.worldEditMeshJob.mcCellGeometryCounts.Dispose();
-        this.worldEditMeshJob.mcCellIndices.Dispose();
-        this.worldEditMeshJob.mcCellVertexData.Dispose();
-        this.worldEditMeshJob.vertices.Dispose();
-        this.worldEditMeshJob.normals.Dispose();
-        this.worldEditMeshJob.indices.Dispose();
-        this.worldEditMeshJob.lights.Dispose();
-        this.worldEditMeshJob.mats1234.Dispose();
-        this.worldEditMeshJob.mats5678.Dispose();
-        this.worldEditMeshJob.weights1234.Dispose();
-        this.worldEditMeshJob.weights5678.Dispose();
-        this.worldEditMeshJob.cornerPositions.Dispose();
-        this.worldEditMeshJob.cornerDensities.Dispose();
-        this.worldEditMeshJob.cornerMaterials.Dispose();
-        this.worldEditMeshJob.cornerNormals.Dispose();
-        this.worldEditMeshJob.cornerLightVoxels.Dispose();
-        this.worldEditMeshJob.cellIndices.Dispose();
-        this.worldEditMeshJob.mappedIndices.Dispose();
-        this.worldEditMeshJob.chunk00densities.Dispose();
-        this.worldEditMeshJob.chunk00materials.Dispose();
-        this.worldEditMeshJob.chunk00lights.Dispose();
-        this.worldEditMeshJob.chunk10densities.Dispose();
-        this.worldEditMeshJob.chunk10materials.Dispose();
-        this.worldEditMeshJob.chunk10lights.Dispose();
-        this.worldEditMeshJob.chunk20densities.Dispose();
-        this.worldEditMeshJob.chunk20materials.Dispose();
-        this.worldEditMeshJob.chunk20lights.Dispose();
-        this.worldEditMeshJob.chunk01densities.Dispose();
-        this.worldEditMeshJob.chunk01materials.Dispose();
-        this.worldEditMeshJob.chunk01lights.Dispose();
-        this.worldEditMeshJob.chunk11densities.Dispose();
-        this.worldEditMeshJob.chunk11materials.Dispose();
-        this.worldEditMeshJob.chunk11lights.Dispose();
-        this.worldEditMeshJob.chunk21densities.Dispose();
-        this.worldEditMeshJob.chunk21materials.Dispose();
-        this.worldEditMeshJob.chunk21lights.Dispose();
-        this.worldEditMeshJob.chunk02densities.Dispose();
-        this.worldEditMeshJob.chunk02materials.Dispose();
-        this.worldEditMeshJob.chunk02lights.Dispose();
-        this.worldEditMeshJob.chunk12densities.Dispose();
-        this.worldEditMeshJob.chunk12materials.Dispose();
-        this.worldEditMeshJob.chunk12lights.Dispose();
-        this.worldEditMeshJob.chunk22densities.Dispose();
-        this.worldEditMeshJob.chunk22materials.Dispose();
-        this.worldEditMeshJob.chunk22lights.Dispose();
-    }
-
     private void InitMaterial()
     {
         Texture2DArray texColor = new Texture2DArray(1024, 1024, 6, TextureFormat.RGBA32, true, false);
@@ -805,7 +699,7 @@ public class World : MonoBehaviour
             cornerDensities = new NativeArray<sbyte>(8, Allocator.Persistent),
             cornerMaterials = new NativeArray<byte>(8, Allocator.Persistent),
             cornerNormals = new NativeArray<float3>(8, Allocator.Persistent),
-            cornerLightVoxels = new NativeArray<byte>(8, Allocator.Persistent),
+            cornerLights = new NativeArray<float2>(8, Allocator.Persistent),
             cellIndices = new NativeList<int>(Allocator.Persistent),
             mappedIndices = new NativeList<ushort>(Allocator.Persistent)
         };
@@ -873,7 +767,7 @@ public class World : MonoBehaviour
             cornerDensities = new NativeArray<sbyte>(8, Allocator.Persistent),
             cornerMaterials = new NativeArray<byte>(8, Allocator.Persistent),
             cornerNormals = new NativeArray<float3>(8, Allocator.Persistent),
-            cornerLightVoxels = new NativeArray<byte>(8, Allocator.Persistent),
+            cornerLights = new NativeArray<float2>(8, Allocator.Persistent),
             cellIndices = new NativeList<int>(Allocator.Persistent),
             mappedIndices = new NativeList<ushort>(Allocator.Persistent)
         };
@@ -883,6 +777,134 @@ public class World : MonoBehaviour
         this.worldEditMeshJob.mcCellGeometryCounts.CopyFrom(Tables.cellGeometryCounts);
         this.worldEditMeshJob.mcCellIndices.CopyFrom(Tables.cellIndices);
         this.worldEditMeshJob.mcCellVertexData.CopyFrom(Tables.cellVertexData);
+    }
+
+    private void DisposeJobs()
+    {
+        if (!this.generateTerrainJobDone) this.generateTerrainJobHandle.Complete();
+        if (!this.sunLightJobDone) this.sunLightJobHandle.Complete();
+        if (!this.meshTerrainJobDone) this.meshTerrainJobHandle.Complete();
+        if (!this.worldEditMeshJobDone) this.worldEditMeshJobHandle.Complete();
+
+        this.generateTerrainJob.densities.Dispose();
+        this.generateTerrainJob.heights.Dispose();
+        this.generateTerrainJob.materials.Dispose();
+
+        this.sunLightJob.lightVoxels.Dispose();
+        this.sunLightJob.lightQueue.Dispose();
+        this.sunLightJob.densities.Dispose();
+        this.sunLightJob.lights.Dispose();
+        this.sunLightJob.chunk00densities.Dispose();
+        this.sunLightJob.chunk10densities.Dispose();
+        this.sunLightJob.chunk20densities.Dispose();
+        this.sunLightJob.chunk01densities.Dispose();
+        this.sunLightJob.chunk11densities.Dispose();
+        this.sunLightJob.chunk21densities.Dispose();
+        this.sunLightJob.chunk02densities.Dispose();
+        this.sunLightJob.chunk12densities.Dispose();
+        this.sunLightJob.chunk22densities.Dispose();
+
+        this.meshTerrainJob.chunkDensities.Dispose();
+        this.meshTerrainJob.chunkMaterials.Dispose();
+        this.meshTerrainJob.chunkLights.Dispose();
+        this.meshTerrainJob.mcCornerPositions.Dispose();
+        this.meshTerrainJob.mcCellClasses.Dispose();
+        this.meshTerrainJob.mcCellGeometryCounts.Dispose();
+        this.meshTerrainJob.mcCellIndices.Dispose();
+        this.meshTerrainJob.mcCellVertexData.Dispose();
+        this.meshTerrainJob.vertices.Dispose();
+        this.meshTerrainJob.normals.Dispose();
+        this.meshTerrainJob.indices.Dispose();
+        this.meshTerrainJob.lights.Dispose();
+        this.meshTerrainJob.mats1234.Dispose();
+        this.meshTerrainJob.mats5678.Dispose();
+        this.meshTerrainJob.weights1234.Dispose();
+        this.meshTerrainJob.weights5678.Dispose();
+        this.meshTerrainJob.cornerPositions.Dispose();
+        this.meshTerrainJob.cornerDensities.Dispose();
+        this.meshTerrainJob.cornerMaterials.Dispose();
+        this.meshTerrainJob.cornerNormals.Dispose();
+        this.meshTerrainJob.cornerLights.Dispose();
+        this.meshTerrainJob.cellIndices.Dispose();
+        this.meshTerrainJob.mappedIndices.Dispose();
+        this.meshTerrainJob.chunk00densities.Dispose();
+        this.meshTerrainJob.chunk00materials.Dispose();
+        this.meshTerrainJob.chunk00lights.Dispose();
+        this.meshTerrainJob.chunk10densities.Dispose();
+        this.meshTerrainJob.chunk10materials.Dispose();
+        this.meshTerrainJob.chunk10lights.Dispose();
+        this.meshTerrainJob.chunk20densities.Dispose();
+        this.meshTerrainJob.chunk20materials.Dispose();
+        this.meshTerrainJob.chunk20lights.Dispose();
+        this.meshTerrainJob.chunk01densities.Dispose();
+        this.meshTerrainJob.chunk01materials.Dispose();
+        this.meshTerrainJob.chunk01lights.Dispose();
+        this.meshTerrainJob.chunk11densities.Dispose();
+        this.meshTerrainJob.chunk11materials.Dispose();
+        this.meshTerrainJob.chunk11lights.Dispose();
+        this.meshTerrainJob.chunk21densities.Dispose();
+        this.meshTerrainJob.chunk21materials.Dispose();
+        this.meshTerrainJob.chunk21lights.Dispose();
+        this.meshTerrainJob.chunk02densities.Dispose();
+        this.meshTerrainJob.chunk02materials.Dispose();
+        this.meshTerrainJob.chunk02lights.Dispose();
+        this.meshTerrainJob.chunk12densities.Dispose();
+        this.meshTerrainJob.chunk12materials.Dispose();
+        this.meshTerrainJob.chunk12lights.Dispose();
+        this.meshTerrainJob.chunk22densities.Dispose();
+        this.meshTerrainJob.chunk22materials.Dispose();
+        this.meshTerrainJob.chunk22lights.Dispose();
+
+        this.worldEditMeshJob.chunkDensities.Dispose();
+        this.worldEditMeshJob.chunkMaterials.Dispose();
+        this.worldEditMeshJob.chunkLights.Dispose();
+        this.worldEditMeshJob.mcCornerPositions.Dispose();
+        this.worldEditMeshJob.mcCellClasses.Dispose();
+        this.worldEditMeshJob.mcCellGeometryCounts.Dispose();
+        this.worldEditMeshJob.mcCellIndices.Dispose();
+        this.worldEditMeshJob.mcCellVertexData.Dispose();
+        this.worldEditMeshJob.vertices.Dispose();
+        this.worldEditMeshJob.normals.Dispose();
+        this.worldEditMeshJob.indices.Dispose();
+        this.worldEditMeshJob.lights.Dispose();
+        this.worldEditMeshJob.mats1234.Dispose();
+        this.worldEditMeshJob.mats5678.Dispose();
+        this.worldEditMeshJob.weights1234.Dispose();
+        this.worldEditMeshJob.weights5678.Dispose();
+        this.worldEditMeshJob.cornerPositions.Dispose();
+        this.worldEditMeshJob.cornerDensities.Dispose();
+        this.worldEditMeshJob.cornerMaterials.Dispose();
+        this.worldEditMeshJob.cornerNormals.Dispose();
+        this.worldEditMeshJob.cornerLights.Dispose();
+        this.worldEditMeshJob.cellIndices.Dispose();
+        this.worldEditMeshJob.mappedIndices.Dispose();
+        this.worldEditMeshJob.chunk00densities.Dispose();
+        this.worldEditMeshJob.chunk00materials.Dispose();
+        this.worldEditMeshJob.chunk00lights.Dispose();
+        this.worldEditMeshJob.chunk10densities.Dispose();
+        this.worldEditMeshJob.chunk10materials.Dispose();
+        this.worldEditMeshJob.chunk10lights.Dispose();
+        this.worldEditMeshJob.chunk20densities.Dispose();
+        this.worldEditMeshJob.chunk20materials.Dispose();
+        this.worldEditMeshJob.chunk20lights.Dispose();
+        this.worldEditMeshJob.chunk01densities.Dispose();
+        this.worldEditMeshJob.chunk01materials.Dispose();
+        this.worldEditMeshJob.chunk01lights.Dispose();
+        this.worldEditMeshJob.chunk11densities.Dispose();
+        this.worldEditMeshJob.chunk11materials.Dispose();
+        this.worldEditMeshJob.chunk11lights.Dispose();
+        this.worldEditMeshJob.chunk21densities.Dispose();
+        this.worldEditMeshJob.chunk21materials.Dispose();
+        this.worldEditMeshJob.chunk21lights.Dispose();
+        this.worldEditMeshJob.chunk02densities.Dispose();
+        this.worldEditMeshJob.chunk02materials.Dispose();
+        this.worldEditMeshJob.chunk02lights.Dispose();
+        this.worldEditMeshJob.chunk12densities.Dispose();
+        this.worldEditMeshJob.chunk12materials.Dispose();
+        this.worldEditMeshJob.chunk12lights.Dispose();
+        this.worldEditMeshJob.chunk22densities.Dispose();
+        this.worldEditMeshJob.chunk22materials.Dispose();
+        this.worldEditMeshJob.chunk22lights.Dispose();
     }
 
     //
@@ -1095,7 +1117,7 @@ public class World : MonoBehaviour
         // Voxel Position Relative To Chunk
         Vector3Int relativePosition = new Vector3Int(0, 0, 0);
         relativePosition.x = Mathf.RoundToInt(worldPosition.x) % 16;
-        relativePosition.y = Mathf.RoundToInt(worldPosition.y);
+        relativePosition.y = Mathf.RoundToInt(worldPosition.y + 1.0f);
         relativePosition.z = Mathf.RoundToInt(worldPosition.z) % 16;
         relativePosition.y = Mathf.Clamp(relativePosition.y, 2, 253);
 

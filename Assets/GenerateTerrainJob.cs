@@ -49,6 +49,7 @@ public struct GenerateTerrainJob : IJob
                 xLocal = 0;
                 for (int x = startPosition.x; x <= endPosition.x; x++)
                 {
+                    /*
                     float height = heights[xLocal + zLocal * chunkSize.x];
 
                     density = 127;
@@ -100,6 +101,7 @@ public struct GenerateTerrainJob : IJob
                         density = 127;
                         material = 255;
                     }
+                    */
 
                     if (y >= 80)
                     {
@@ -112,7 +114,7 @@ public struct GenerateTerrainJob : IJob
 
                         if (caveNoise < 0.0f)
                         {
-                            density = (sbyte)-math.round(127.0f * -caveNoise);
+                            density = (sbyte)math.round(127.0f * caveNoise);
                             density -= 1;
                             material = (byte)((noise.snoise(new float3(x, y, z) * 0.1f) + 1.0f) / 2.0f * 3.0f);
                         }
