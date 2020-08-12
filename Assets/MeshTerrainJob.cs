@@ -307,14 +307,15 @@ public struct MeshTerrainJob : IJob
             this.mats1234.Add(matIds1234);
             this.mats5678.Add(matIds5678);
 
-            if (matIds1234.x == materialId) weights1234.x = 1.0f; else weights1234.x = 0.0f;
-            if (matIds1234.y == materialId) weights1234.y = 1.0f; else weights1234.y = 0.0f;
-            if (matIds1234.z == materialId) weights1234.z = 1.0f; else weights1234.z = 0.0f;
-            if (matIds1234.w == materialId) weights1234.w = 1.0f; else weights1234.w = 0.0f;
-            if (matIds5678.x == materialId) weights5678.x = 1.0f; else weights5678.x = 0.0f;
-            if (matIds5678.y == materialId) weights5678.y = 1.0f; else weights5678.y = 0.0f;
-            if (matIds5678.z == materialId) weights5678.z = 1.0f; else weights5678.z = 0.0f;
-            if (matIds5678.w == materialId) weights5678.w = 1.0f; else weights5678.w = 0.0f;
+            bool isMaterialSet = false;
+            if (matIds1234.x == materialId) { weights1234.x = 1.0f; isMaterialSet = true; } else weights1234.x = 0.0f;
+            if (matIds1234.y == materialId && !isMaterialSet) { weights1234.y = 1.0f; isMaterialSet = true; } else weights1234.y = 0.0f;
+            if (matIds1234.z == materialId && !isMaterialSet) { weights1234.z = 1.0f; isMaterialSet = true; } else weights1234.z = 0.0f;
+            if (matIds1234.w == materialId && !isMaterialSet) { weights1234.w = 1.0f; isMaterialSet = true; } else weights1234.w = 0.0f;
+            if (matIds5678.x == materialId && !isMaterialSet) { weights5678.x = 1.0f; isMaterialSet = true; } else weights5678.x = 0.0f;
+            if (matIds5678.y == materialId && !isMaterialSet) { weights5678.y = 1.0f; isMaterialSet = true; } else weights5678.y = 0.0f;
+            if (matIds5678.z == materialId && !isMaterialSet) { weights5678.z = 1.0f; isMaterialSet = true; } else weights5678.z = 0.0f;
+            if (matIds5678.w == materialId && !isMaterialSet) { weights5678.w = 1.0f; isMaterialSet = true; } else weights5678.w = 0.0f;
 
             this.weights1234.Add(weights1234);
             this.weights5678.Add(weights5678);

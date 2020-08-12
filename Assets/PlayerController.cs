@@ -52,7 +52,6 @@ public class PlayerController : MonoBehaviour
 
     private void Update()
     {
-        this.LookAround();
         this.ToggleCrouching();
         this.ToggleRunning();
         this.DetermineSpeed();
@@ -96,6 +95,12 @@ public class PlayerController : MonoBehaviour
 
     private void FixedUpdate()
     {
+        this.transform.Rotate(Vector3.up, Input.GetAxis("Mouse X") * this.mouseSensivity.x * Time.fixedDeltaTime);
+
+        this.cameraRotation -= Input.GetAxis("Mouse Y") * this.mouseSensivity.y * Time.fixedDeltaTime;
+        this.cameraRotation = Mathf.Clamp(this.cameraRotation, -90.0f, 90.0f);
+        this.playerCamera.transform.localRotation = Quaternion.Euler(this.cameraRotation, 0.0f, 0.0f);
+
         Vector3 opposite = 10.0f * new Vector3(this.velocity.x, 0.0f, this.velocity.z);
 
         if (this.characterController.isGrounded)
@@ -117,17 +122,6 @@ public class PlayerController : MonoBehaviour
     public void Stop()
     {
         this.velocity = Vector3.zero;
-    }
-
-    private void LookAround()
-    {
-        // Rotate Player
-        this.transform.Rotate(Vector3.up, Input.GetAxis("Mouse X") * this.mouseSensivity.x * Time.deltaTime);
-
-        // Rotate Camera
-        this.cameraRotation -= Input.GetAxis("Mouse Y") * this.mouseSensivity.y * Time.deltaTime;
-        this.cameraRotation = Mathf.Clamp(this.cameraRotation, -90.0f, 90.0f);
-        this.playerCamera.transform.localRotation = Quaternion.Euler(this.cameraRotation, 0.0f, 0.0f);
     }
 
     private void ToggleCrouching()

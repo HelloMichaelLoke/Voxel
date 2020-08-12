@@ -8,7 +8,7 @@ using Unity.Mathematics;
 public class World : MonoBehaviour
 {
     // Temp
-    public Transform locator;
+    public GameObject locator;
 
     // World Settings
     public int chunkDistance = 3;
@@ -27,8 +27,8 @@ public class World : MonoBehaviour
     public Texture2D[] chunkTexturesHeight;
 
     // Chunks store lights, densities and materials
-    Dictionary<Vector2Int, Chunk> chunks = new Dictionary<Vector2Int, Chunk>();
-    Dictionary<Vector2Int, GameObject> chunkGameObjects = new Dictionary<Vector2Int, GameObject>();
+    private Dictionary<Vector2Int, Chunk> chunks = new Dictionary<Vector2Int, Chunk>();
+    private Dictionary<Vector2Int, GameObject> chunkGameObjects = new Dictionary<Vector2Int, GameObject>();
 
     // Job for generating densities and materials
     private GenerateTerrainJob generateTerrainJob;
@@ -54,13 +54,20 @@ public class World : MonoBehaviour
     private MeshTerrainJob worldEditMeshJob;
     private JobHandle worldEditMeshJobHandle;
     private bool worldEditMeshJobDone = true;
-    Queue<Vector2Int> worldEditMeshQueue = new Queue<Vector2Int>();
+    private Queue<Vector2Int> worldEditMeshQueue = new Queue<Vector2Int>();
 
     private bool isUpdateChunkQueuePending = false;
-    Queue<Vector2Int> loadChunkQueue = new Queue<Vector2Int>();
-    Queue<Vector2Int> generateTerrainQueue = new Queue<Vector2Int>();
-    Queue<Vector2Int> generateLightsQueue = new Queue<Vector2Int>();
-    Queue<Vector2Int> generateMeshQueue = new Queue<Vector2Int>();
+    private Queue<Vector2Int> loadChunkQueue = new Queue<Vector2Int>();
+    private Queue<Vector2Int> generateTerrainQueue = new Queue<Vector2Int>();
+    private Queue<Vector2Int> generateLightsQueue = new Queue<Vector2Int>();
+    private Queue<Vector2Int> generateMeshQueue = new Queue<Vector2Int>();
+
+    // Clean Up
+    private Queue<Vector2Int> chunksToDestroy = new Queue<Vector2Int>();
+    private Queue<Vector2Int> chunksToDeactivate = new Queue<Vector2Int>();
+
+    // Chunk Loading
+    private List<Vector2Int> chunkLoadingOrder = new List<Vector2Int>();
 
     // Diagnostics
     private System.Diagnostics.Stopwatch stopwatch = new System.Diagnostics.Stopwatch();
@@ -74,23 +81,73 @@ public class World : MonoBehaviour
         this.InitJobs();
 
         this.playerWorldPositionLast = this.playerWorldPosition.position;
+
+        this.chunkLoadingOrder.Add(new Vector2Int(0, 0));
+        for (int i = 1; i <= this.chunkDistance + 2; i++)
+        {
+            for (int x = -i; x <= i; x++)
+            {
+                for (int z = -i; z <= i; z++)
+                {
+                    if (!this.chunkLoadingOrder.Contains(new Vector2Int(x, z)))
+                    {
+                        this.chunkLoadingOrder.Add(new Vector2Int(x, z));
+                    }
+                }
+            }
+        }
     }
 
     private void Update()
     {
-        if (Input.GetMouseButtonDown(0))
+        if (this.locator.activeInHierarchy)
         {
-            this.WorldEditDraw(locator.position, -127, 1);
+            if (Input.GetMouseButtonDown(0))
+            {
+                this.WorldEditDraw(locator.transform.position, -127, 1);
+            }
+
+            if (Input.GetMouseButtonDown(1))
+            {
+                this.WorldEditErase(locator.transform.position);
+            }
+
+            if (Input.GetMouseButtonDown(2))
+            {
+                this.WorldEditHeighten(locator.transform.position, 20);
+            }
         }
 
-        if (Input.GetMouseButtonDown(1))
+        if (this.chunksToDestroy.Count > 0)
         {
-            this.WorldEditErase(locator.position);
+            Vector2Int chunkPosition = this.chunksToDestroy.Dequeue();
+
+            if (!this.IsInChunkDistance(chunkPosition, 2))
+            {
+                this.chunks.Remove(chunkPosition);
+                if (this.chunkGameObjects.ContainsKey(chunkPosition))
+                {
+                    Destroy(this.chunkGameObjects[chunkPosition].GetComponent<MeshFilter>().mesh);
+                    Destroy(this.chunkGameObjects[chunkPosition]);
+                    this.chunkGameObjects.Remove(chunkPosition);
+                }
+            }
+        }
+
+        if (this.chunksToDeactivate.Count > 0)
+        {
+            Vector2Int chunkPosition = this.chunksToDeactivate.Dequeue();
+
+            if (!this.IsInChunkDistance(chunkPosition))
+            {
+                this.chunkGameObjects[chunkPosition].SetActive(false);
+            }
         }
 
         this.UpdatePlayerChunkPosition();
 
         this.UpdateChunkQueue();
+
         this.LoadChunks();
         this.GenerateTerrains();
         this.GenerateLights();
@@ -123,7 +180,7 @@ public class World : MonoBehaviour
         {
             this.worldEditQueueEmpty = true;
             this.worldEditStopwatch.Stop();
-            Debug.Log("worldEdit took: " + this.worldEditStopwatch.ElapsedMilliseconds + "ms");
+            //Debug.Log("worldEdit took: " + this.worldEditStopwatch.ElapsedMilliseconds + "ms");
         }
 
         if (this.worldEditMeshJobDone && this.worldEditMeshQueue.Count > 0)
@@ -274,66 +331,33 @@ public class World : MonoBehaviour
             this.isUpdateChunkQueuePending = false;
         }
 
-        Vector2Int chunkPosition = this.playerChunkPosition;
-
-        List<Vector2Int> chunksToDelete = new List<Vector2Int>();
+        this.startStopwatch();
         foreach (KeyValuePair<Vector2Int, Chunk> chunk in this.chunks)
         {
             if (!this.IsInChunkDistance(chunk.Key, 2))
             {
-                chunksToDelete.Add(chunk.Key);
+                if (!this.chunksToDestroy.Contains(chunk.Key))
+                {
+                    this.chunksToDestroy.Enqueue(chunk.Key);
+                }
             }
         }
-
-        foreach (Vector2Int chunkPos in chunksToDelete)
-        {
-            this.chunks.Remove(chunkPos);
-        }
-
-        List<Vector2Int> chunkGameObjectsToDelete = new List<Vector2Int>();
-        List<Vector2Int> chunkGameObjectsToDeactivate = new List<Vector2Int>();
 
         foreach (KeyValuePair<Vector2Int, GameObject> chunkGameObject in this.chunkGameObjects)
         {
-            if (!this.IsInChunkDistance(chunkGameObject.Key))
+            if (!this.IsInChunkDistance(chunkGameObject.Key) && this.IsInChunkDistance(chunkGameObject.Key, 2))
             {
-                if (!this.IsInChunkDistance(chunkGameObject.Key, 2))
+                if (!this.chunksToDeactivate.Contains(chunkGameObject.Key))
                 {
-                    chunkGameObjectsToDelete.Add(chunkGameObject.Key);
-                }
-                else
-                {
-                    chunkGameObjectsToDeactivate.Add(chunkGameObject.Key);
+                    this.chunksToDeactivate.Enqueue(chunkGameObject.Key);
                 }
             }
         }
+        this.stopStopwatch("A", 1);
 
-        foreach (Vector2Int chunkPos in chunkGameObjectsToDelete)
+        foreach (Vector2Int offset in this.chunkLoadingOrder)
         {
-            Destroy(this.chunkGameObjects[chunkPos].GetComponent<MeshFilter>().mesh);
-            Destroy(this.chunkGameObjects[chunkPos]);
-            this.chunkGameObjects.Remove(chunkPos);
-        }
-
-        foreach (Vector2Int chunkPos in chunkGameObjectsToDeactivate)
-        {
-            this.chunkGameObjects[chunkPos].SetActive(false);
-        }
-
-        this.loadChunkQueue.Enqueue(chunkPosition);
-        for (int i = 1; i <= this.chunkDistance + 2; i++)
-        {
-            for (int x = -i; x <= i; x++)
-            {
-                for (int z = -i; z <= i; z++)
-                {
-                    chunkPosition = this.playerChunkPosition + new Vector2Int(x, z);
-                    if (!this.loadChunkQueue.Contains(chunkPosition))
-                    {
-                        this.loadChunkQueue.Enqueue(chunkPosition);
-                    }
-                }
-            }
+            this.loadChunkQueue.Enqueue(this.playerChunkPosition + offset);
         }
     }
 
@@ -345,13 +369,16 @@ public class World : MonoBehaviour
 
             if (!this.chunks.ContainsKey(chunkPosition))
             {
-                this.generateTerrainQueue.Enqueue(chunkPosition);
+                if (!this.generateTerrainQueue.Contains(chunkPosition))
+                {
+                    this.generateTerrainQueue.Enqueue(chunkPosition);
+                }
             }
             else
             {
                 if (!this.chunks[chunkPosition].areLightsDone)
                 {
-                    if (this.IsInChunkDistance(chunkPosition, 1))
+                    if (!this.generateLightsQueue.Contains(chunkPosition) && this.IsInChunkDistance(chunkPosition, 1))
                     {
                         this.generateLightsQueue.Enqueue(chunkPosition);
                     }
@@ -360,7 +387,7 @@ public class World : MonoBehaviour
                 {
                     if (!this.chunkGameObjects.ContainsKey(chunkPosition))
                     {
-                        if (this.IsInChunkDistance(chunkPosition))
+                        if (!this.generateMeshQueue.Contains(chunkPosition) && this.IsInChunkDistance(chunkPosition))
                         {
                             this.generateMeshQueue.Enqueue(chunkPosition);
                         }
@@ -1212,7 +1239,10 @@ public class World : MonoBehaviour
         return editPosition;
     }
 
-    // Stuff
+    //
+    // Diagnostics
+    //
+
     private void startStopwatch()
     {
         this.stopwatch.Reset();

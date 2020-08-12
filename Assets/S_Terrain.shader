@@ -117,6 +117,11 @@
                             height = currentHeight;
                             mat = currentMat;
                         }
+                        else if (currentHeight >= height2)
+                        {
+                            height2 = currentHeight;
+                            mat2 = currentMat;
+                        }
                     }
 
                     if (i.weight34.x != 0.0)
@@ -132,6 +137,11 @@
                             mat2 = mat;
                             height = currentHeight;
                             mat = currentMat;
+                        }
+                        else if (currentHeight >= height2)
+                        {
+                            height2 = currentHeight;
+                            mat2 = currentMat;
                         }
                     }
 
@@ -149,6 +159,11 @@
                             height = currentHeight;
                             mat = currentMat;
                         }
+                        else if (currentHeight >= height2)
+                        {
+                            height2 = currentHeight;
+                            mat2 = currentMat;
+                        }
                     }
 
                     if (i.weight56.x != 0.0)
@@ -164,6 +179,11 @@
                             mat2 = mat;
                             height = currentHeight;
                             mat = currentMat;
+                        }
+                        else if (currentHeight >= height2)
+                        {
+                            height2 = currentHeight;
+                            mat2 = currentMat;
                         }
                     }
 
@@ -181,6 +201,11 @@
                             height = currentHeight;
                             mat = currentMat;
                         }
+                        else if (currentHeight >= height2)
+                        {
+                            height2 = currentHeight;
+                            mat2 = currentMat;
+                        }
                     }
 
                     if (i.weight78.x != 0.0)
@@ -196,6 +221,11 @@
                             mat2 = mat;
                             height = currentHeight;
                             mat = currentMat;
+                        }
+                        else if (currentHeight >= height2)
+                        {
+                            height2 = currentHeight;
+                            mat2 = currentMat;
                         }
                     }
 
@@ -213,28 +243,17 @@
                             height = currentHeight;
                             mat = currentMat;
                         }
+                        else if (currentHeight >= height2)
+                        {
+                            height2 = currentHeight;
+                            mat2 = currentMat;
+                        }
                     }
 
                     float3 albedoZ = UNITY_SAMPLE_TEX2DARRAY(_TexColor, float3(i.worldPos.xy, mat)) * weight.z;
                     float3 albedoY = UNITY_SAMPLE_TEX2DARRAY(_TexColor, float3(i.worldPos.xz, mat)) * weight.y;
                     float3 albedoX = UNITY_SAMPLE_TEX2DARRAY(_TexColor, float3(i.worldPos.yz, mat)) * weight.x;
                     float3 albedo = albedoX + albedoY + albedoZ;
-
-                    /*if (height2 != 0.0)
-                    {
-                        float3 albedoZ2 = UNITY_SAMPLE_TEX2DARRAY(_TexColor, float3(i.worldPos.xy, mat2)) * weight.z;
-                        float3 albedoY2 = UNITY_SAMPLE_TEX2DARRAY(_TexColor, float3(i.worldPos.xz, mat2)) * weight.y;
-                        float3 albedoX2 = UNITY_SAMPLE_TEX2DARRAY(_TexColor, float3(i.worldPos.yz, mat2)) * weight.x;
-                        float3 albedo2 = albedoX2 + albedoY2 + albedoZ2;
-                       
-
-                        float distanceTo2 = distance(height, height2);
-                        if (distanceTo2 <= 0.15)
-                        {
-                            float blend = distanceTo2 / 0.15;
-                            albedo = lerp(albedo2, albedo, blend);
-                        }
-                    }*/
 
                     float light = max(i.light.x * _SunLight, i.light.y);
                     
