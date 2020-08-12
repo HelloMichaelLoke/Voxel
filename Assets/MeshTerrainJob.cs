@@ -212,14 +212,14 @@ public struct MeshTerrainJob : IJob
             this.cornerNormals[i] = this.GetNormal(index);
         }
 
-        float matId1 = (float)cornerMaterials[0] / 255.0f;
-        float matId2 = (float)cornerMaterials[1] / 255.0f;
-        float matId3 = (float)cornerMaterials[2] / 255.0f;
-        float matId4 = (float)cornerMaterials[3] / 255.0f;
-        float matId5 = (float)cornerMaterials[4] / 255.0f;
-        float matId6 = (float)cornerMaterials[5] / 255.0f;
-        float matId7 = (float)cornerMaterials[6] / 255.0f;
-        float matId8 = (float)cornerMaterials[7] / 255.0f;
+        float matId1 = (float)cornerMaterials[0];
+        float matId2 = (float)cornerMaterials[1];
+        float matId3 = (float)cornerMaterials[2];
+        float matId4 = (float)cornerMaterials[3];
+        float matId5 = (float)cornerMaterials[4];
+        float matId6 = (float)cornerMaterials[5];
+        float matId7 = (float)cornerMaterials[6];
+        float matId8 = (float)cornerMaterials[7];
 
         float4 matIds1234 = new float4(matId1, matId2, matId3, matId4);
         float4 matIds5678 = new float4(matId5, matId6, matId7, matId8);
@@ -272,18 +272,11 @@ public struct MeshTerrainJob : IJob
             float weight0 = (float)t / 256.0f;
             float weight1 = (float)u / 256.0f;
 
+            if (weight0 >= 0.90f) { weight0 = 0.90f; weight1 = 0.1f; }
+            if (weight1 >= 0.90f) { weight1 = 0.90f; weight0 = 0.1f; }
+
             float3 vertex;
-            if ((t & 0x00FF) == 0)
-            {
-                if (t == 0)
-                    vertex = position1;
-                else
-                    vertex = position0;
-            }
-            else
-            {
-                vertex = weight0 * position0 + weight1 * position1;
-            }
+            vertex = weight0 * position0 + weight1 * position1;
 
             float3 normal = weight0 * normal0 + weight1 * normal1;
             float sunLight = weight0 * sunLight0 + weight1 * sunLight1;
@@ -293,11 +286,14 @@ public struct MeshTerrainJob : IJob
             float materialId;
             if (density0 < density1)
             {
-                materialId = (float)material0 / 255.0f;
+                materialId = (float)material0;
+
+                if (material1 != 255)
+                    materialId = (float)material1;
             }
             else
             {
-                materialId = (float)material1 / 255.0f;
+                materialId = (float)material1;
             }
 
             this.lights.Add(new float2(sunLight, sourceLight));
@@ -308,14 +304,14 @@ public struct MeshTerrainJob : IJob
             this.mats5678.Add(matIds5678);
 
             bool isMaterialSet = false;
-            if (matIds1234.x == materialId) { weights1234.x = 1.0f; isMaterialSet = true; } else weights1234.x = 0.0f;
-            if (matIds1234.y == materialId && !isMaterialSet) { weights1234.y = 1.0f; isMaterialSet = true; } else weights1234.y = 0.0f;
-            if (matIds1234.z == materialId && !isMaterialSet) { weights1234.z = 1.0f; isMaterialSet = true; } else weights1234.z = 0.0f;
-            if (matIds1234.w == materialId && !isMaterialSet) { weights1234.w = 1.0f; isMaterialSet = true; } else weights1234.w = 0.0f;
-            if (matIds5678.x == materialId && !isMaterialSet) { weights5678.x = 1.0f; isMaterialSet = true; } else weights5678.x = 0.0f;
-            if (matIds5678.y == materialId && !isMaterialSet) { weights5678.y = 1.0f; isMaterialSet = true; } else weights5678.y = 0.0f;
-            if (matIds5678.z == materialId && !isMaterialSet) { weights5678.z = 1.0f; isMaterialSet = true; } else weights5678.z = 0.0f;
-            if (matIds5678.w == materialId && !isMaterialSet) { weights5678.w = 1.0f; isMaterialSet = true; } else weights5678.w = 0.0f;
+            if (matId1 == materialId) { weights1234.x = 1.0f; isMaterialSet = true; } else weights1234.x = 0.0f;
+            if (matId2 == materialId && !isMaterialSet) { weights1234.y = 1.0f; isMaterialSet = true; } else weights1234.y = 0.0f;
+            if (matId3 == materialId && !isMaterialSet) { weights1234.z = 1.0f; isMaterialSet = true; } else weights1234.z = 0.0f;
+            if (matId4 == materialId && !isMaterialSet) { weights1234.w = 1.0f; isMaterialSet = true; } else weights1234.w = 0.0f;
+            if (matId5 == materialId && !isMaterialSet) { weights5678.x = 1.0f; isMaterialSet = true; } else weights5678.x = 0.0f;
+            if (matId6 == materialId && !isMaterialSet) { weights5678.y = 1.0f; isMaterialSet = true; } else weights5678.y = 0.0f;
+            if (matId7 == materialId && !isMaterialSet) { weights5678.z = 1.0f; isMaterialSet = true; } else weights5678.z = 0.0f;
+            if (matId8 == materialId && !isMaterialSet) { weights5678.w = 1.0f; isMaterialSet = true; } else weights5678.w = 0.0f;
 
             this.weights1234.Add(weights1234);
             this.weights5678.Add(weights5678);

@@ -116,7 +116,7 @@ public struct GenerateTerrainJob : IJob
                         {
                             density = (sbyte)math.round(127.0f * caveNoise);
                             density -= 1;
-                            material = (byte)((noise.snoise(new float3(x, y, z) * 0.1f) + 1.0f) / 2.0f * 3.0f);
+                            material = (byte)math.round((noise.snoise(new float3(x, y, z) * 0.1f) + 1.0f) / 2.0f * 3.0f);
                         }
                         else
                         {

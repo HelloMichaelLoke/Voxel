@@ -77,11 +77,100 @@
                     float3 weight = abs(i.worldNormal);
                     weight /= weight.x + weight.y + weight.z;
 
+                    ////////////////////////////////////////////////////////////////////////////////////
+                    /*
+                    float flatMat = 0.0;
+                    float flatWeight = 0.0;
+
+                    if (i.weight12.x != 0.0)
+                    {
+                        if (i.weight12.x >= flatWeight)
+                        {
+                            flatWeight = i.weight12.x;
+                            flatMat = i.mat1234.x;
+                        }
+                    }
+
+                    if (i.weight12.y != 0.0)
+                    {
+                        if (i.weight12.y >= flatWeight)
+                        {
+                            flatWeight = i.weight12.y;
+                            flatMat = i.mat1234.y;
+                        }
+                    }
+
+                    if (i.weight34.x != 0.0)
+                    {
+                        if (i.weight34.x >= flatWeight)
+                        {
+                            flatWeight = i.weight34.x;
+                            flatMat = i.mat1234.z;
+                        }
+                    }
+
+                    if (i.weight34.y != 0.0)
+                    {
+                        if (i.weight34.y >= flatWeight)
+                        {
+                            flatWeight = i.weight34.y;
+                            flatMat = i.mat1234.w;
+                        }
+                    }
+
+                    if (i.weight56.x != 0.0)
+                    {
+                        if (i.weight56.x >= flatWeight)
+                        {
+                            flatWeight = i.weight56.x;
+                            flatMat = i.mat5678.x;
+                        }
+                    }
+
+                    if (i.weight56.y != 0.0)
+                    {
+                        if (i.weight56.y >= flatWeight)
+                        {
+                            flatWeight = i.weight56.y;
+                            flatMat = i.mat5678.y;
+                        }
+                    }
+
+                    if (i.weight78.x != 0.0)
+                    {
+                        if (i.weight78.x >= flatWeight)
+                        {
+                            flatWeight = i.weight78.x;
+                            flatMat = i.mat5678.z;
+                        }
+                    }
+
+                    if (i.weight78.y != 0.0)
+                    {
+                        if (i.weight78.y >= flatWeight)
+                        {
+                            flatWeight = i.weight78.y;
+                            flatMat = i.mat5678.w;
+                        }
+                    }
+
+                    float3 flatAlbedoZ = UNITY_SAMPLE_TEX2DARRAY(_TexColor, float3(i.worldPos.xy, flatMat)) * weight.z;
+                    float3 flatAlbedoY = UNITY_SAMPLE_TEX2DARRAY(_TexColor, float3(i.worldPos.xz, flatMat)) * weight.y;
+                    float3 flatAlbedoX = UNITY_SAMPLE_TEX2DARRAY(_TexColor, float3(i.worldPos.yz, flatMat)) * weight.x;
+                    float3 flatAlbedo = flatAlbedoX + flatAlbedoY + flatAlbedoZ;
+
+                    float flatLight = max(i.light.x * _SunLight, i.light.y);
+
+                    float3 flatColor = (_TexBrightness + (1.0 - _TexBrightness) * flatLight) * flatAlbedo;
+
+                    return float4(flatColor.x, flatColor.y, flatColor.z, 1.0);
+                    */
+                    /////////////////////////////////////////////////////////////////////////////////////////
+
                     float mat = -1.0;
                     float height = 0.0;
-                    float height2 = 0.0;
                     float mat2 = -1.0;
-                    float weightHighest = 0.0;
+                    float height2 = 0.0;
 
                     float currentMat = 0.0;
                     float currentHeight = 0.0;
@@ -91,7 +180,7 @@
 
                     if (i.weight12.x != 0.0)
                     {
-                        currentMat = i.mat1234.x * 255.0;
+                        currentMat = i.mat1234.x;
                         currentXY = UNITY_SAMPLE_TEX2DARRAY(_TexHeight, float3(i.worldPos.xy, currentMat)) * weight.z;
                         currentXZ = UNITY_SAMPLE_TEX2DARRAY(_TexHeight, float3(i.worldPos.xz, currentMat)) * weight.y;
                         currentYZ = UNITY_SAMPLE_TEX2DARRAY(_TexHeight, float3(i.worldPos.yz, currentMat)) * weight.x;
@@ -105,7 +194,7 @@
 
                     if (i.weight12.y != 0.0)
                     {
-                        currentMat = i.mat1234.y * 255.0;
+                        currentMat = i.mat1234.y;
                         currentXY = UNITY_SAMPLE_TEX2DARRAY(_TexHeight, float3(i.worldPos.xy, currentMat)) * weight.z;
                         currentXZ = UNITY_SAMPLE_TEX2DARRAY(_TexHeight, float3(i.worldPos.xz, currentMat)) * weight.y;
                         currentYZ = UNITY_SAMPLE_TEX2DARRAY(_TexHeight, float3(i.worldPos.yz, currentMat)) * weight.x;
@@ -126,7 +215,7 @@
 
                     if (i.weight34.x != 0.0)
                     {
-                        currentMat = i.mat1234.z * 255.0;
+                        currentMat = i.mat1234.z;
                         currentXY = UNITY_SAMPLE_TEX2DARRAY(_TexHeight, float3(i.worldPos.xy, currentMat)) * weight.z;
                         currentXZ = UNITY_SAMPLE_TEX2DARRAY(_TexHeight, float3(i.worldPos.xz, currentMat)) * weight.y;
                         currentYZ = UNITY_SAMPLE_TEX2DARRAY(_TexHeight, float3(i.worldPos.yz, currentMat)) * weight.x;
@@ -147,7 +236,7 @@
 
                     if (i.weight34.y != 0.0)
                     {
-                        currentMat = i.mat1234.w * 255.0;
+                        currentMat = i.mat1234.w;
                         currentXY = UNITY_SAMPLE_TEX2DARRAY(_TexHeight, float3(i.worldPos.xy, currentMat)) * weight.z;
                         currentXZ = UNITY_SAMPLE_TEX2DARRAY(_TexHeight, float3(i.worldPos.xz, currentMat)) * weight.y;
                         currentYZ = UNITY_SAMPLE_TEX2DARRAY(_TexHeight, float3(i.worldPos.yz, currentMat)) * weight.x;
@@ -168,7 +257,7 @@
 
                     if (i.weight56.x != 0.0)
                     {
-                        currentMat = i.mat5678.x * 255.0;
+                        currentMat = i.mat5678.x;
                         currentXY = UNITY_SAMPLE_TEX2DARRAY(_TexHeight, float3(i.worldPos.xy, currentMat)) * weight.z;
                         currentXZ = UNITY_SAMPLE_TEX2DARRAY(_TexHeight, float3(i.worldPos.xz, currentMat)) * weight.y;
                         currentYZ = UNITY_SAMPLE_TEX2DARRAY(_TexHeight, float3(i.worldPos.yz, currentMat)) * weight.x;
@@ -189,7 +278,7 @@
 
                     if (i.weight56.y != 0.0)
                     {
-                        currentMat = i.mat5678.y * 255.0;
+                        currentMat = i.mat5678.y;
                         currentXY = UNITY_SAMPLE_TEX2DARRAY(_TexHeight, float3(i.worldPos.xy, currentMat)) * weight.z;
                         currentXZ = UNITY_SAMPLE_TEX2DARRAY(_TexHeight, float3(i.worldPos.xz, currentMat)) * weight.y;
                         currentYZ = UNITY_SAMPLE_TEX2DARRAY(_TexHeight, float3(i.worldPos.yz, currentMat)) * weight.x;
@@ -210,7 +299,7 @@
 
                     if (i.weight78.x != 0.0)
                     {
-                        currentMat = i.mat5678.z * 255.0;
+                        currentMat = i.mat5678.z;
                         currentXY = UNITY_SAMPLE_TEX2DARRAY(_TexHeight, float3(i.worldPos.xy, currentMat)) * weight.z;
                         currentXZ = UNITY_SAMPLE_TEX2DARRAY(_TexHeight, float3(i.worldPos.xz, currentMat)) * weight.y;
                         currentYZ = UNITY_SAMPLE_TEX2DARRAY(_TexHeight, float3(i.worldPos.yz, currentMat)) * weight.x;
@@ -231,7 +320,7 @@
 
                     if (i.weight78.y != 0.0)
                     {
-                        currentMat = i.mat5678.w * 255.0;
+                        currentMat = i.mat5678.w;
                         currentXY = UNITY_SAMPLE_TEX2DARRAY(_TexHeight, float3(i.worldPos.xy, currentMat)) * weight.z;
                         currentXZ = UNITY_SAMPLE_TEX2DARRAY(_TexHeight, float3(i.worldPos.xz, currentMat)) * weight.y;
                         currentYZ = UNITY_SAMPLE_TEX2DARRAY(_TexHeight, float3(i.worldPos.yz, currentMat)) * weight.x;

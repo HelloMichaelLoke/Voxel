@@ -118,40 +118,19 @@ public class World : MonoBehaviour
             }
         }
 
-        if (this.chunksToDestroy.Count > 0)
-        {
-            Vector2Int chunkPosition = this.chunksToDestroy.Dequeue();
-
-            if (!this.IsInChunkDistance(chunkPosition, 2))
-            {
-                this.chunks.Remove(chunkPosition);
-                if (this.chunkGameObjects.ContainsKey(chunkPosition))
-                {
-                    Destroy(this.chunkGameObjects[chunkPosition].GetComponent<MeshFilter>().mesh);
-                    Destroy(this.chunkGameObjects[chunkPosition]);
-                    this.chunkGameObjects.Remove(chunkPosition);
-                }
-            }
-        }
-
-        if (this.chunksToDeactivate.Count > 0)
-        {
-            Vector2Int chunkPosition = this.chunksToDeactivate.Dequeue();
-
-            if (!this.IsInChunkDistance(chunkPosition))
-            {
-                this.chunkGameObjects[chunkPosition].SetActive(false);
-            }
-        }
+        
 
         this.UpdatePlayerChunkPosition();
 
         this.UpdateChunkQueue();
 
+        this.UnloadChunks();
         this.LoadChunks();
         this.GenerateTerrains();
-        this.GenerateLights();
-        this.GenerateMeshes();
+        this.GenerateLights(); // 3ms
+        this.GenerateMeshes(); // 9-14ms
+        
+
         this.UpdateWorldEdit();
 
         /*
@@ -331,7 +310,6 @@ public class World : MonoBehaviour
             this.isUpdateChunkQueuePending = false;
         }
 
-        this.startStopwatch();
         foreach (KeyValuePair<Vector2Int, Chunk> chunk in this.chunks)
         {
             if (!this.IsInChunkDistance(chunk.Key, 2))
@@ -353,11 +331,40 @@ public class World : MonoBehaviour
                 }
             }
         }
-        this.stopStopwatch("A", 1);
 
         foreach (Vector2Int offset in this.chunkLoadingOrder)
         {
-            this.loadChunkQueue.Enqueue(this.playerChunkPosition + offset);
+            Vector2Int chunkPosition = this.playerChunkPosition + offset;
+            this.loadChunkQueue.Enqueue(chunkPosition);
+        }
+    }
+
+    private void UnloadChunks()
+    {
+        if (this.chunksToDestroy.Count > 0)
+        {
+            Vector2Int chunkPosition = this.chunksToDestroy.Dequeue();
+
+            if (!this.IsInChunkDistance(chunkPosition, 2))
+            {
+                this.chunks.Remove(chunkPosition);
+                if (this.chunkGameObjects.ContainsKey(chunkPosition))
+                {
+                    Destroy(this.chunkGameObjects[chunkPosition].GetComponent<MeshFilter>().mesh);
+                    Destroy(this.chunkGameObjects[chunkPosition]);
+                    this.chunkGameObjects.Remove(chunkPosition);
+                }
+            }
+        }
+
+        if (this.chunksToDeactivate.Count > 0)
+        {
+            Vector2Int chunkPosition = this.chunksToDeactivate.Dequeue();
+
+            if (!this.IsInChunkDistance(chunkPosition) && this.chunkGameObjects.ContainsKey(chunkPosition))
+            {
+                this.chunkGameObjects[chunkPosition].SetActive(false);
+            }
         }
     }
 
@@ -365,41 +372,47 @@ public class World : MonoBehaviour
     {
         if (this.loadChunkQueue.Count != 0)
         {
-            Vector2Int chunkPosition = this.loadChunkQueue.Dequeue();
+            Vector2Int chunkPosition = new Vector2Int(0, 0);
 
-            if (!this.chunks.ContainsKey(chunkPosition))
+            bool foundUnfinishedChunk = false;
+            int iterations = 0;
+            while(!foundUnfinishedChunk && iterations <= 200)
             {
-                if (!this.generateTerrainQueue.Contains(chunkPosition))
+                chunkPosition = this.loadChunkQueue.Dequeue();
+                if (this.chunkGameObjects.ContainsKey(chunkPosition))
                 {
-                    this.generateTerrainQueue.Enqueue(chunkPosition);
-                }
-            }
-            else
-            {
-                if (!this.chunks[chunkPosition].areLightsDone)
-                {
-                    if (!this.generateLightsQueue.Contains(chunkPosition) && this.IsInChunkDistance(chunkPosition, 1))
+                    if (!this.chunkGameObjects[chunkPosition].activeInHierarchy)
                     {
-                        this.generateLightsQueue.Enqueue(chunkPosition);
+                        this.chunkGameObjects[chunkPosition].SetActive(true);
                     }
                 }
                 else
                 {
-                    if (!this.chunkGameObjects.ContainsKey(chunkPosition))
-                    {
-                        if (!this.generateMeshQueue.Contains(chunkPosition) && this.IsInChunkDistance(chunkPosition))
-                        {
-                            this.generateMeshQueue.Enqueue(chunkPosition);
-                        }
-                    }
-                    else
-                    {
-                        if (this.IsInChunkDistance(chunkPosition))
-                        {
-                            this.chunkGameObjects[chunkPosition].SetActive(true);
-                        }
-                    }
+                    foundUnfinishedChunk = true;
                 }
+                iterations++;
+            }
+
+            if (!foundUnfinishedChunk)
+            {
+                return;
+            }
+
+            if (!this.chunks.ContainsKey(chunkPosition))
+            {
+                this.generateTerrainQueue.Enqueue(chunkPosition);
+                return;
+            }
+
+            if (!this.chunks[chunkPosition].areLightsDone)
+            {
+                this.generateLightsQueue.Enqueue(chunkPosition);
+                return;
+            }
+
+            if (!this.chunkGameObjects.ContainsKey(chunkPosition))
+            {
+                this.generateMeshQueue.Enqueue(chunkPosition);
             }
         }
     }
@@ -441,6 +454,13 @@ public class World : MonoBehaviour
         if (this.sunLightJobDone && this.generateLightsQueue.Count != 0)
         {
             Vector2Int chunkPosition = this.generateLightsQueue.Peek();
+
+            if (!this.IsInChunkDistance(chunkPosition, 1))
+            {
+                this.generateLightsQueue.Dequeue();
+                return;
+            }
+
             bool neighborsDone = true;
             Vector2Int neighborPosition = new Vector2Int(0, 0);
             for (int x = -1; x <= 1; x++)
@@ -596,7 +616,7 @@ public class World : MonoBehaviour
                 this.meshTerrainJobDone = false;
             }
         }
-
+        
         if (!this.meshTerrainJobDone && this.meshTerrainJobHandle.IsCompleted)
         {
             this.meshTerrainJobHandle.Complete();
@@ -623,7 +643,9 @@ public class World : MonoBehaviour
             mesh.SetUVs(4, this.meshTerrainJob.lights.AsArray());
             mesh.RecalculateBounds();
 
-            chunkGameObject.GetComponent<MeshFilter>().sharedMesh = mesh;
+            Debug.Log("triangle count: " + this.meshTerrainJob.indices.Length);
+
+            chunkGameObject.GetComponent<MeshFilter>().mesh = mesh;
             chunkGameObject.GetComponent<MeshRenderer>().material = this.terrainMaterial;
             chunkGameObject.GetComponent<MeshCollider>().sharedMesh = mesh;
 
@@ -1167,6 +1189,18 @@ public class World : MonoBehaviour
     private bool IsInChunkDistance(Vector2Int chunkPosition, int overflow = 0)
     {
         if (Mathf.Abs(chunkPosition.x - this.playerChunkPosition.x) <= this.chunkDistance + overflow && Mathf.Abs(chunkPosition.y - this.playerChunkPosition.y) <= this.chunkDistance + overflow)
+        {
+            return true;
+        }
+        else
+        {
+            return false;
+        }
+    }
+
+    private bool IsInChunkDistanceLast(Vector2Int chunkPosition, int overflow = 0)
+    {
+        if (Mathf.Abs(chunkPosition.x - this.playerChunkPositionLast.x) <= this.chunkDistance + overflow && Mathf.Abs(chunkPosition.y - this.playerChunkPositionLast.y) <= this.chunkDistance + overflow)
         {
             return true;
         }
