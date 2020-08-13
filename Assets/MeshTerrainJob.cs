@@ -74,6 +74,9 @@ public struct MeshTerrainJob : IJob
     public NativeList<int> cellIndices;
     public NativeList<ushort> mappedIndices;
 
+    // Physics Mesh Breakpoints (vertex array position, index array position)
+    public NativeList<int2> breakPoints;
+
     public void Execute()
     {
         this.MergeChunks();
@@ -184,6 +187,11 @@ public struct MeshTerrainJob : IJob
 
     private void MeshCell(int x, int y, int z)
     {
+        if (x == 1 && z == 1 && y % 16 == 1)
+        {
+            this.breakPoints.Add(new int2(this.vertices.Length, this.indices.Length));
+        }
+
         for (int i = 0; i < 8; i++)
         {
             this.cornerPositions[i] = this.mcCornerPositions[i] + new float3(x, y, z);

@@ -103,7 +103,7 @@ public struct GenerateTerrainJob : IJob
                     }
                     */
 
-                    if (y >= 80)
+                    if (y >= 252)
                     {
                         density = 127;
                         material = 255;

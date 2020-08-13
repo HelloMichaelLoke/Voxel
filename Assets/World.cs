@@ -1,6 +1,7 @@
 ﻿using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
+using UnityEngine.Rendering;
 using Unity.Collections;
 using Unity.Jobs;
 using Unity.Mathematics;
@@ -9,6 +10,7 @@ public class World : MonoBehaviour
 {
     // Temp
     public GameObject locator;
+    public Material colliderMaterial;
 
     // World Settings
     public int chunkDistance = 3;
@@ -127,10 +129,8 @@ public class World : MonoBehaviour
         this.UnloadChunks();
         this.LoadChunks();
         this.GenerateTerrains();
-        this.GenerateLights(); // 3ms
-        this.GenerateMeshes(); // 9-14ms
-        
-
+        this.GenerateLights(); // 3ms (SetSunLightsFromNative)
+        this.GenerateMeshes(); // 9-14ms (creating mesh 5ms & uploading meshcollider 5ms)
         this.UpdateWorldEdit();
 
         /*
@@ -348,6 +348,7 @@ public class World : MonoBehaviour
             if (!this.IsInChunkDistance(chunkPosition, 2))
             {
                 this.chunks.Remove(chunkPosition);
+
                 if (this.chunkGameObjects.ContainsKey(chunkPosition))
                 {
                     Destroy(this.chunkGameObjects[chunkPosition].GetComponent<MeshFilter>().mesh);
@@ -376,12 +377,12 @@ public class World : MonoBehaviour
 
             bool foundUnfinishedChunk = false;
             int iterations = 0;
-            while(!foundUnfinishedChunk && iterations <= 200)
+            while(!foundUnfinishedChunk && this.loadChunkQueue.Count > 0 && iterations <= 200)
             {
                 chunkPosition = this.loadChunkQueue.Dequeue();
                 if (this.chunkGameObjects.ContainsKey(chunkPosition))
                 {
-                    if (!this.chunkGameObjects[chunkPosition].activeInHierarchy)
+                    if (!this.chunkGameObjects[chunkPosition].activeInHierarchy && this.IsInChunkDistance(chunkPosition))
                     {
                         this.chunkGameObjects[chunkPosition].SetActive(true);
                     }
@@ -508,7 +509,7 @@ public class World : MonoBehaviour
             this.chunks[chunkPosition].SetSunLightsFromNative(this.sunLightJob.sunLights);
             this.chunks[chunkPosition].areLightsDone = true;
 
-            if (Mathf.Abs(chunkPosition.x - this.playerChunkPosition.x) <= this.chunkDistance && Mathf.Abs(chunkPosition.y - this.playerChunkPosition.y) <= this.chunkDistance)
+            if (this.IsInChunkDistance(chunkPosition))
             {
                 this.generateMeshQueue.Enqueue(chunkPosition);
             }
@@ -574,6 +575,7 @@ public class World : MonoBehaviour
                 this.meshTerrainJob.mats5678.Clear();
                 this.meshTerrainJob.weights1234.Clear();
                 this.meshTerrainJob.weights5678.Clear();
+                this.meshTerrainJob.breakPoints.Clear();
 
                 this.meshTerrainJob.chunk00densities.CopyFrom(chunk00.GetDensities());
                 this.meshTerrainJob.chunk00materials.CopyFrom(chunk00.GetMaterials());
@@ -622,13 +624,14 @@ public class World : MonoBehaviour
             this.meshTerrainJobHandle.Complete();
             this.meshTerrainJobDone = true;
 
+            this.startStopwatch();
+
             Vector2Int chunkPosition = new Vector2Int(this.meshTerrainJob.chunkPosition.x, this.meshTerrainJob.chunkPosition.y);
 
             GameObject chunkGameObject = new GameObject("Chunk");
             chunkGameObject.transform.position = new Vector3(chunkPosition.x * 16, 0, chunkPosition.y * 16);
             chunkGameObject.AddComponent<MeshFilter>();
             chunkGameObject.AddComponent<MeshRenderer>();
-            chunkGameObject.AddComponent<MeshCollider>();
 
             Mesh mesh = new Mesh();
             mesh.name = "Chunk Mesh";
@@ -642,14 +645,70 @@ public class World : MonoBehaviour
             mesh.SetUVs(3, this.meshTerrainJob.mats5678.AsArray());
             mesh.SetUVs(4, this.meshTerrainJob.lights.AsArray());
             mesh.RecalculateBounds();
+            
+            for (int i = 0; i < this.meshTerrainJob.breakPoints.Length; i++)
+            {
+                int startPositionVertices = this.meshTerrainJob.breakPoints[i].x;
+                int endPositionVertices;
+                int startPositionIndices = this.meshTerrainJob.breakPoints[i].y;
+                int endPositionIndices;
 
-            Debug.Log("triangle count: " + this.meshTerrainJob.indices.Length);
+                if (i < this.meshTerrainJob.breakPoints.Length - 1)
+                {
+                    endPositionVertices = this.meshTerrainJob.breakPoints[i + 1].x;
+                    endPositionIndices = this.meshTerrainJob.breakPoints[i + 1].y;
+                }
+                else
+                {
+                    endPositionVertices = this.meshTerrainJob.vertices.Length;
+                    endPositionIndices = this.meshTerrainJob.indices.Length;
+                }
+
+                if (startPositionVertices == endPositionVertices || startPositionIndices == endPositionIndices)
+                {
+                    continue;
+                }
+
+                int lengthVertices = endPositionVertices - startPositionVertices;
+                int lengthIndices = endPositionIndices - startPositionIndices;
+
+                Mesh colliderMesh = new Mesh();
+
+                Vector3[] colliderVertices = new Vector3[lengthVertices];
+                this.meshTerrainJob.vertices.AsArray().GetSubArray(startPositionVertices, lengthVertices).CopyTo(colliderVertices);
+
+                for (int j = 0; j < lengthVertices; j++)
+                {
+                    colliderVertices[j].y -= i * 16.0f;
+                }
+
+                int[] colliderIndices = new int[lengthIndices];
+                this.meshTerrainJob.indices.AsArray().GetSubArray(startPositionIndices, lengthIndices).CopyTo(colliderIndices);
+
+                int colliderIndicesOffset = startPositionVertices;
+
+                for (int j = 0; j < lengthIndices; j++)
+                {
+                    colliderIndices[j] -= colliderIndicesOffset;
+                }
+
+                colliderMesh.SetVertices(colliderVertices);
+                colliderMesh.SetIndices(colliderIndices, MeshTopology.Triangles, 0);
+
+                colliderMesh.RecalculateBounds();
+
+                GameObject colliderGameObject = new GameObject();
+                colliderGameObject.AddComponent<MeshCollider>();
+                colliderGameObject.GetComponent<MeshCollider>().sharedMesh = colliderMesh;
+                colliderGameObject.transform.position = new Vector3(chunkPosition.x * 16, i * 16, chunkPosition.y * 16);
+            }
 
             chunkGameObject.GetComponent<MeshFilter>().mesh = mesh;
             chunkGameObject.GetComponent<MeshRenderer>().material = this.terrainMaterial;
-            chunkGameObject.GetComponent<MeshCollider>().sharedMesh = mesh;
 
             this.chunkGameObjects.Add(chunkPosition, chunkGameObject);
+
+            this.stopStopwatch("A", 1);
 
             this.chunks[chunkPosition].areMeshesDone = true;
         }
@@ -726,6 +785,8 @@ public class World : MonoBehaviour
         // Mesh Job
         this.meshTerrainJob = new MeshTerrainJob()
         {
+            breakPoints = new NativeList<int2>(Allocator.Persistent),
+
             chunkDensities = new NativeArray<sbyte>(92416, Allocator.Persistent),
             chunkMaterials = new NativeArray<byte>(92416, Allocator.Persistent),
             chunkLights = new NativeArray<byte>(92416, Allocator.Persistent),
@@ -793,6 +854,8 @@ public class World : MonoBehaviour
         // World Edit Mesh Job
         this.worldEditMeshJob = new MeshTerrainJob()
         {
+            breakPoints = new NativeList<int2>(Allocator.Persistent),
+
             chunkDensities = new NativeArray<sbyte>(92416, Allocator.Persistent),
             chunkMaterials = new NativeArray<byte>(92416, Allocator.Persistent),
             chunkLights = new NativeArray<byte>(92416, Allocator.Persistent),
@@ -898,6 +961,7 @@ public class World : MonoBehaviour
         this.tempSunLightJob.chunk12densities.Dispose();
         this.tempSunLightJob.chunk22densities.Dispose();
 
+        this.meshTerrainJob.breakPoints.Dispose();
         this.meshTerrainJob.chunkDensities.Dispose();
         this.meshTerrainJob.chunkMaterials.Dispose();
         this.meshTerrainJob.chunkLights.Dispose();
@@ -949,6 +1013,7 @@ public class World : MonoBehaviour
         this.meshTerrainJob.chunk22materials.Dispose();
         this.meshTerrainJob.chunk22lights.Dispose();
 
+        this.worldEditMeshJob.breakPoints.Dispose();
         this.worldEditMeshJob.chunkDensities.Dispose();
         this.worldEditMeshJob.chunkMaterials.Dispose();
         this.worldEditMeshJob.chunkLights.Dispose();
