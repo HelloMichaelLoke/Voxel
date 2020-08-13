@@ -40,8 +40,8 @@ public class PlayerController : MonoBehaviour
     private void Start()
     {
         // Mouse Cursor
-        //Cursor.lockState = CursorLockMode.Locked;
-        //Cursor.visible = false;
+        Cursor.lockState = CursorLockMode.Locked;
+        Cursor.visible = false;
 
         // Set References
         this.characterController = this.GetComponent<CharacterController>();

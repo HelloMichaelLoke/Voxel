@@ -76,6 +76,8 @@
                 {
                     float3 weight = abs(i.worldNormal);
                     weight /= weight.x + weight.y + weight.z;
+
+                    
                     
                     ////////////////////////////////////////////////////////////////////////////////////
                     /*

@@ -1354,4 +1354,22 @@ public class World : MonoBehaviour
         if (stopwatch.ElapsedMilliseconds > threshold)
             Debug.Log(name + ": " + stopwatch.ElapsedMilliseconds);
     }
+
+    // Other
+
+    public float GetLightValue(Vector3 worldPosition)
+    {
+        float lightValue = 1.0f;
+
+        Vector3Int editPositon = this.WorldToEditPosition(worldPosition);
+        Vector2Int chunkPosition = new Vector2Int(editPositon.x, editPositon.y);
+        int arrayPosition = editPositon.z;
+
+        if (this.chunks.ContainsKey(chunkPosition))
+        {
+            lightValue = (float)this.chunks[chunkPosition].GetSunLight(arrayPosition) / 15.0f;
+        }
+
+        return lightValue;
+    }
 }
