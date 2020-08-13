@@ -32,6 +32,8 @@ public class World : MonoBehaviour
     private Dictionary<Vector2Int, Chunk> chunks = new Dictionary<Vector2Int, Chunk>();
     private Dictionary<Vector2Int, GameObject> chunkGameObjects = new Dictionary<Vector2Int, GameObject>();
 
+    private Dictionary<Vector2Int, ChunkObject> chunkObjects = new Dictionary<Vector2Int, ChunkObject>();
+
     // Job for generating densities and materials
     private GenerateTerrainJob generateTerrainJob;
     private JobHandle generateTerrainJobHandle;
@@ -628,6 +630,70 @@ public class World : MonoBehaviour
 
             Vector2Int chunkPosition = new Vector2Int(this.meshTerrainJob.chunkPosition.x, this.meshTerrainJob.chunkPosition.y);
 
+            /*
+            ChunkObject chunkObject = new ChunkObject(chunkPosition, this.terrainMaterial);
+
+            chunkObject.SetRenderer(
+                this.meshTerrainJob.vertices.AsArray(),
+                this.meshTerrainJob.normals.AsArray(),
+                this.meshTerrainJob.indices.AsArray(),
+                this.meshTerrainJob.weights1234.AsArray(),
+                this.meshTerrainJob.weights5678.AsArray(),
+                this.meshTerrainJob.mats1234.AsArray(),
+                this.meshTerrainJob.mats5678.AsArray(),
+                this.meshTerrainJob.lights.AsArray()
+            );
+
+            for (int i = 0; i < 16; i++)
+            {
+                int startPositionVertices = this.meshTerrainJob.breakPoints[i].x;
+                int endPositionVertices;
+                int startPositionIndices = this.meshTerrainJob.breakPoints[i].y;
+                int endPositionIndices;
+
+                if (i < 15)
+                {
+                    endPositionVertices = this.meshTerrainJob.breakPoints[i + 1].x;
+                    endPositionIndices = this.meshTerrainJob.breakPoints[i + 1].y;
+                }
+                else
+                {
+                    endPositionVertices = this.meshTerrainJob.vertices.Length;
+                    endPositionIndices = this.meshTerrainJob.indices.Length;
+                }
+
+                if (startPositionVertices == endPositionVertices || startPositionIndices == endPositionIndices)
+                {
+                    continue;
+                }
+
+                int lengthVertices = endPositionVertices - startPositionVertices;
+                int lengthIndices = endPositionIndices - startPositionIndices;
+
+                Vector3[] colliderVertices = new Vector3[lengthVertices];
+                this.meshTerrainJob.vertices.AsArray().GetSubArray(startPositionVertices, lengthVertices).CopyTo(colliderVertices);
+
+                for (int j = 0; j < lengthVertices; j++)
+                {
+                    colliderVertices[j].y -= i * 16.0f;
+                }
+
+                int[] colliderIndices = new int[lengthIndices];
+                this.meshTerrainJob.indices.AsArray().GetSubArray(startPositionIndices, lengthIndices).CopyTo(colliderIndices);
+
+                int colliderIndicesOffset = startPositionVertices;
+
+                for (int j = 0; j < lengthIndices; j++)
+                {
+                    colliderIndices[j] -= colliderIndicesOffset;
+                }
+
+                chunkObject.SetCollider(i, colliderVertices, colliderIndices);
+            }
+
+            this.chunkObjects.Add(chunkPosition, chunkObject);
+            */
+
             GameObject chunkGameObject = new GameObject("Chunk");
             chunkGameObject.transform.position = new Vector3(chunkPosition.x * 16, 0, chunkPosition.y * 16);
             chunkGameObject.AddComponent<MeshFilter>();
@@ -645,7 +711,7 @@ public class World : MonoBehaviour
             mesh.SetUVs(3, this.meshTerrainJob.mats5678.AsArray());
             mesh.SetUVs(4, this.meshTerrainJob.lights.AsArray());
             mesh.RecalculateBounds();
-            
+
             for (int i = 0; i < this.meshTerrainJob.breakPoints.Length; i++)
             {
                 int startPositionVertices = this.meshTerrainJob.breakPoints[i].x;
@@ -708,9 +774,9 @@ public class World : MonoBehaviour
 
             this.chunkGameObjects.Add(chunkPosition, chunkGameObject);
 
-            this.stopStopwatch("A", 1);
-
             this.chunks[chunkPosition].areMeshesDone = true;
+
+            this.stopStopwatch("Create ChunkObject", 1);
         }
     }
 

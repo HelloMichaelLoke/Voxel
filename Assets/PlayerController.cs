@@ -56,6 +56,12 @@ public class PlayerController : MonoBehaviour
         this.ToggleRunning();
         this.DetermineSpeed();
 
+        this.transform.Rotate(Vector3.up, Input.GetAxis("Mouse X") * this.mouseSensivity.x * Time.deltaTime);
+
+        this.cameraRotation -= Input.GetAxis("Mouse Y") * this.mouseSensivity.y * Time.deltaTime;
+        this.cameraRotation = Mathf.Clamp(this.cameraRotation, -90.0f, 90.0f);
+        this.playerCamera.transform.localRotation = Quaternion.Euler(this.cameraRotation, 0.0f, 0.0f);
+
         Vector2 velocityHorizontal = new Vector2(this.velocity.x, this.velocity.z);
 
         this.direction = Vector3.zero;
@@ -95,12 +101,6 @@ public class PlayerController : MonoBehaviour
 
     private void FixedUpdate()
     {
-        this.transform.Rotate(Vector3.up, Input.GetAxis("Mouse X") * this.mouseSensivity.x * Time.fixedDeltaTime);
-
-        this.cameraRotation -= Input.GetAxis("Mouse Y") * this.mouseSensivity.y * Time.fixedDeltaTime;
-        this.cameraRotation = Mathf.Clamp(this.cameraRotation, -90.0f, 90.0f);
-        this.playerCamera.transform.localRotation = Quaternion.Euler(this.cameraRotation, 0.0f, 0.0f);
-
         Vector3 opposite = 10.0f * new Vector3(this.velocity.x, 0.0f, this.velocity.z);
 
         if (this.characterController.isGrounded)

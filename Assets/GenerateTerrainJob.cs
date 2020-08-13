@@ -49,6 +49,7 @@ public struct GenerateTerrainJob : IJob
                 xLocal = 0;
                 for (int x = startPosition.x; x <= endPosition.x; x++)
                 {
+                    /*
                     float height = heights[xLocal + zLocal * chunkSize.x];
 
                     density = 127;
@@ -100,8 +101,9 @@ public struct GenerateTerrainJob : IJob
                         density = 127;
                         material = 255;
                     }
+                    */
 
-                    if (y >= 80)
+                    if (y >= 70)
                     {
                         density = 127;
                         material = 255;
