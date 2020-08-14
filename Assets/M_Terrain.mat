@@ -88,8 +88,8 @@ Material:
     - _SpecularHighlights: 1
     - _SrcBlend: 1
     - _SunLight: 1
-    - _TexBrightness: 0.147
-    - _TexScale: 1
+    - _TexBrightness: 0.033
+    - _TexScale: 0.25
     - _UVSec: 0
     - _ZWrite: 1
     m_Colors:

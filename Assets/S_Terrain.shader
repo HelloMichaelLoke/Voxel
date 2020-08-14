@@ -56,7 +56,7 @@
                 {
                     v2f o;
                     o.pos = UnityObjectToClipPos(i.vertex);
-                    o.worldPos = mul(unity_ObjectToWorld, i.vertex).xyz;
+                    o.worldPos = mul(unity_ObjectToWorld, i.vertex).xyz * _TexScale;
                     o.worldNormal = UnityObjectToWorldNormal(i.normal);
                     o.normal = i.normal;
                     o.weight12 = float2(i.texcoord0.x, i.texcoord0.y);

@@ -31,6 +31,8 @@ public class ChunkObject
         for (int i = 0; i < 16; i++)
         {
             this.colliderObjects[i] = new GameObject();
+            this.colliderObjects[i].tag = "Terrain";
+            this.colliderObjects[i].layer = 8;
             this.colliderObjects[i].name = "Chunk Collider (" + chunkPosition.x.ToString() + ", " + i + ", " + chunkPosition.y.ToString() + ")";
             this.colliderObjects[i].transform.position = new Vector3(chunkPosition.x * 16.0f, i * 16.0f, chunkPosition.y * 16.0f);
             this.colliderObjects[i].AddComponent<MeshCollider>();
@@ -72,6 +74,7 @@ public class ChunkObject
 
     public void SetRenderer(NativeArray<Vector3> vertices, NativeArray<Vector3> normals, NativeArray<int> indices, NativeArray<Vector4> weights1234, NativeArray<Vector4> weights5678, NativeArray<Vector4> mats1234, NativeArray<Vector4> mats5678, NativeArray<Vector2> lights)
     {
+        this.rendererMesh.Clear();
         this.rendererMesh.SetVertices(vertices);
         this.rendererMesh.SetNormals(normals);
         this.rendererMesh.SetIndices(indices, MeshTopology.Triangles, 0);
