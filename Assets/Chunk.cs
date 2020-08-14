@@ -12,7 +12,6 @@ public class Chunk
     public bool areDensitiesDone = false;
     public bool areMaterialsDone = false;
     public bool areLightsDone = false;
-    // TODO has to be removed, world needs to check game objects instead of this variable
     public bool areMeshesDone = false;
 
     public Chunk()

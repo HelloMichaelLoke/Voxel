@@ -13,7 +13,7 @@ public class World : MonoBehaviour
     public Material colliderMaterial;
 
     // World Settings
-    public int chunkDistance = 3;
+    private int chunkDistance = 5;
 
     // Player Information
     public GameObject playerGameObject;
@@ -30,8 +30,6 @@ public class World : MonoBehaviour
 
     // Chunks store lights, densities and materials
     private Dictionary<Vector2Int, Chunk> chunks = new Dictionary<Vector2Int, Chunk>();
-    private Dictionary<Vector2Int, GameObject> chunkGameObjects = new Dictionary<Vector2Int, GameObject>();
-
     private Dictionary<Vector2Int, ChunkObject> chunkObjects = new Dictionary<Vector2Int, ChunkObject>();
 
     // Job for generating densities and materials
@@ -86,20 +84,44 @@ public class World : MonoBehaviour
 
         this.playerWorldPositionLast = this.playerWorldPosition.position;
 
-        this.chunkLoadingOrder.Add(new Vector2Int(0, 0));
-        for (int i = 1; i <= this.chunkDistance + 2; i++)
+        int arraySize = (this.chunkDistance + 2) * 2 + 1;
+        arraySize = arraySize * arraySize;
+        List<Vector2Int> chunkLoadingOrder = new List<Vector2Int>();
+
+        Vector2Int currentPosition = Vector2Int.zero;
+        int iterator = 1;
+        int i = 0;
+
+        while (i < arraySize)
         {
-            for (int x = -i; x <= i; x++)
+            for (int j = 1; j <= iterator; j++)
             {
-                for (int z = -i; z <= i; z++)
-                {
-                    if (!this.chunkLoadingOrder.Contains(new Vector2Int(x, z)))
-                    {
-                        this.chunkLoadingOrder.Add(new Vector2Int(x, z));
-                    }
-                }
+                chunkLoadingOrder.Add(currentPosition);
+
+                if (iterator % 2 == 1)
+                    currentPosition.y++;
+                else
+                    currentPosition.y--;
+
+                i++;
             }
+
+            for (int j = 1; j <= iterator; j++)
+            {
+                chunkLoadingOrder.Add(currentPosition);
+
+                if (iterator % 2 == 1)
+                    currentPosition.x++;
+                else
+                    currentPosition.x--;
+
+                i++;
+            }
+
+            iterator++;
         }
+
+        this.chunkLoadingOrder = chunkLoadingOrder;
     }
 
     private void Update()
@@ -122,12 +144,12 @@ public class World : MonoBehaviour
             }
         }
 
-        
-
         this.UpdatePlayerChunkPosition();
 
-        this.UpdateChunkQueue();
+        if (!this.chunkObjects.ContainsKey(this.playerChunkPosition))
+            this.playerGameObject.GetComponent<PlayerController>().Stop();
 
+        this.UpdateChunkQueue();
         this.UnloadChunks();
         this.LoadChunks();
         this.GenerateTerrains();
@@ -261,24 +283,21 @@ public class World : MonoBehaviour
 
             Vector2Int chunkPosition = new Vector2Int(this.worldEditMeshJob.chunkPosition.x, this.worldEditMeshJob.chunkPosition.y);
 
-            if (!this.chunkGameObjects.ContainsKey(chunkPosition))
+            if (!this.chunkObjects.ContainsKey(chunkPosition))
                 return;
 
-            GameObject chunkGameObject = this.chunkGameObjects[chunkPosition];
+            this.chunkObjects[chunkPosition].SetRenderer(
+                this.worldEditMeshJob.vertices.AsArray(),
+                this.worldEditMeshJob.normals.AsArray(),
+                this.worldEditMeshJob.indices.AsArray(),
+                this.worldEditMeshJob.weights1234.AsArray(),
+                this.worldEditMeshJob.weights5678.AsArray(),
+                this.worldEditMeshJob.mats1234.AsArray(),
+                this.worldEditMeshJob.mats5678.AsArray(),
+                this.worldEditMeshJob.lights.AsArray()
+            );
 
-            Mesh mesh = chunkGameObject.GetComponent<MeshFilter>().mesh;
-            mesh.Clear();
-            mesh.SetVertices(this.worldEditMeshJob.vertices.AsArray());
-            mesh.SetNormals(this.worldEditMeshJob.normals.AsArray());
-            mesh.SetIndices(this.worldEditMeshJob.indices.AsArray(), MeshTopology.Triangles, 0);
-            mesh.SetUVs(0, this.worldEditMeshJob.weights1234.AsArray());
-            mesh.SetUVs(1, this.worldEditMeshJob.weights5678.AsArray());
-            mesh.SetUVs(2, this.worldEditMeshJob.mats1234.AsArray());
-            mesh.SetUVs(3, this.worldEditMeshJob.mats5678.AsArray());
-            mesh.SetUVs(4, this.worldEditMeshJob.lights.AsArray());
-            mesh.RecalculateBounds();
-
-            chunkGameObject.GetComponent<MeshCollider>().sharedMesh = mesh;
+            // Update Colliders TODO!!!
         }
     }
 
@@ -286,51 +305,41 @@ public class World : MonoBehaviour
     {
         if (this.didPlayerEnterChunk)
         {
-            this.loadChunkQueue.Clear();
             this.generateTerrainQueue.Clear();
             this.generateLightsQueue.Clear();
             this.generateMeshQueue.Clear();
             this.isUpdateChunkQueuePending = true;
         }
 
-        bool isUpdateChunkQueueAllowed = false;
-
         if (this.isUpdateChunkQueuePending)
         {
-            isUpdateChunkQueueAllowed = true;
-            if (this.generateTerrainJobDone == false) isUpdateChunkQueueAllowed = false;
-            if (this.sunLightJobDone == false) isUpdateChunkQueueAllowed = false;
-            if (this.meshTerrainJobDone == false) isUpdateChunkQueueAllowed = false;
+            if (this.generateTerrainJobDone == false) return;
+            if (this.sunLightJobDone == false) return;
+            if (this.meshTerrainJobDone == false) return;
         }
 
-        if (!isUpdateChunkQueueAllowed)
-        {
+        if (!this.isUpdateChunkQueuePending)
             return;
-        }
-        else
-        {
-            this.isUpdateChunkQueuePending = false;
-        }
+
+        this.generateTerrainQueue.Clear();
+        this.generateLightsQueue.Clear();
+        this.generateMeshQueue.Clear();
+
+        this.isUpdateChunkQueuePending = false;
 
         foreach (KeyValuePair<Vector2Int, Chunk> chunk in this.chunks)
         {
             if (!this.IsInChunkDistance(chunk.Key, 2))
             {
-                if (!this.chunksToDestroy.Contains(chunk.Key))
-                {
-                    this.chunksToDestroy.Enqueue(chunk.Key);
-                }
+                this.chunksToDestroy.Enqueue(chunk.Key);
             }
         }
 
-        foreach (KeyValuePair<Vector2Int, GameObject> chunkGameObject in this.chunkGameObjects)
+        foreach (KeyValuePair<Vector2Int, ChunkObject> chunkObject in this.chunkObjects)
         {
-            if (!this.IsInChunkDistance(chunkGameObject.Key) && this.IsInChunkDistance(chunkGameObject.Key, 2))
+            if (!this.IsInChunkDistance(chunkObject.Key) && this.IsInChunkDistance(chunkObject.Key, 2))
             {
-                if (!this.chunksToDeactivate.Contains(chunkGameObject.Key))
-                {
-                    this.chunksToDeactivate.Enqueue(chunkGameObject.Key);
-                }
+                this.chunksToDeactivate.Enqueue(chunkObject.Key);
             }
         }
 
@@ -343,79 +352,61 @@ public class World : MonoBehaviour
 
     private void UnloadChunks()
     {
-        if (this.chunksToDestroy.Count > 0)
+        while (this.chunksToDestroy.Count > 0)
         {
             Vector2Int chunkPosition = this.chunksToDestroy.Dequeue();
 
-            if (!this.IsInChunkDistance(chunkPosition, 2))
+            if (this.chunks[chunkPosition].areMeshesDone)
             {
-                this.chunks.Remove(chunkPosition);
-
-                if (this.chunkGameObjects.ContainsKey(chunkPosition))
-                {
-                    Destroy(this.chunkGameObjects[chunkPosition].GetComponent<MeshFilter>().mesh);
-                    Destroy(this.chunkGameObjects[chunkPosition]);
-                    this.chunkGameObjects.Remove(chunkPosition);
-                }
+                this.chunkObjects[chunkPosition].Destroy();
+                this.chunkObjects.Remove(chunkPosition);
             }
+            this.chunks.Remove(chunkPosition);
         }
 
-        if (this.chunksToDeactivate.Count > 0)
+        while (this.chunksToDeactivate.Count > 0)
         {
             Vector2Int chunkPosition = this.chunksToDeactivate.Dequeue();
-
-            if (!this.IsInChunkDistance(chunkPosition) && this.chunkGameObjects.ContainsKey(chunkPosition))
-            {
-                this.chunkGameObjects[chunkPosition].SetActive(false);
-            }
+            this.chunkObjects[chunkPosition].Deactivate();
         }
     }
 
     private void LoadChunks()
     {
-        if (this.loadChunkQueue.Count != 0)
+        while (this.loadChunkQueue.Count > 0)
         {
-            Vector2Int chunkPosition = new Vector2Int(0, 0);
-
-            bool foundUnfinishedChunk = false;
-            int iterations = 0;
-            while(!foundUnfinishedChunk && this.loadChunkQueue.Count > 0 && iterations <= 200)
-            {
-                chunkPosition = this.loadChunkQueue.Dequeue();
-                if (this.chunkGameObjects.ContainsKey(chunkPosition))
-                {
-                    if (!this.chunkGameObjects[chunkPosition].activeInHierarchy && this.IsInChunkDistance(chunkPosition))
-                    {
-                        this.chunkGameObjects[chunkPosition].SetActive(true);
-                    }
-                }
-                else
-                {
-                    foundUnfinishedChunk = true;
-                }
-                iterations++;
-            }
-
-            if (!foundUnfinishedChunk)
-            {
-                return;
-            }
+            Vector2Int chunkPosition = this.loadChunkQueue.Dequeue();
 
             if (!this.chunks.ContainsKey(chunkPosition))
             {
                 this.generateTerrainQueue.Enqueue(chunkPosition);
-                return;
+                continue;
             }
 
             if (!this.chunks[chunkPosition].areLightsDone)
             {
-                this.generateLightsQueue.Enqueue(chunkPosition);
-                return;
+                if (this.IsInChunkDistance(chunkPosition, 1))
+                {
+                    this.generateLightsQueue.Enqueue(chunkPosition);
+                }
+
+                continue;
             }
 
-            if (!this.chunkGameObjects.ContainsKey(chunkPosition))
+            if (!this.chunks[chunkPosition].areMeshesDone)
             {
-                this.generateMeshQueue.Enqueue(chunkPosition);
+                if (this.IsInChunkDistance(chunkPosition))
+                {
+                    this.generateMeshQueue.Enqueue(chunkPosition);
+                }
+                continue;
+            }
+
+            this.chunkObjects[chunkPosition].Activate();
+
+            if (!this.chunkObjects[chunkPosition].IsActive())
+            {
+                this.chunkObjects[chunkPosition].Activate();
             }
         }
     }
@@ -423,7 +414,7 @@ public class World : MonoBehaviour
     private void GenerateTerrains()
     {
         // Dequeue and schedule terrain generation of the chunk (densities & materials)
-        if (this.generateTerrainJobDone && this.generateTerrainQueue.Count != 0)
+        if (this.generateTerrainJobDone && this.generateTerrainQueue.Count > 0)
         {
             Vector2Int chunkPosition = this.generateTerrainQueue.Dequeue();
 
@@ -454,15 +445,9 @@ public class World : MonoBehaviour
     private void GenerateLights()
     {
         // Dequeue and schedule light generation of the chunk (lights)
-        if (this.sunLightJobDone && this.generateLightsQueue.Count != 0)
+        if (this.sunLightJobDone && this.generateLightsQueue.Count > 0)
         {
             Vector2Int chunkPosition = this.generateLightsQueue.Peek();
-
-            if (!this.IsInChunkDistance(chunkPosition, 1))
-            {
-                this.generateLightsQueue.Dequeue();
-                return;
-            }
 
             bool neighborsDone = true;
             Vector2Int neighborPosition = new Vector2Int(0, 0);
@@ -520,15 +505,9 @@ public class World : MonoBehaviour
 
     private void GenerateMeshes()
     {
-        if (this.meshTerrainJobDone && this.generateMeshQueue.Count != 0)
+        if (this.meshTerrainJobDone && this.generateMeshQueue.Count > 0)
         {
             Vector2Int chunkPosition = this.generateMeshQueue.Peek();
-
-            if (this.chunkGameObjects.ContainsKey(chunkPosition))
-            {
-                this.generateMeshQueue.Dequeue();
-                return;
-            }
 
             bool neighborsDone = true;
             Vector2Int neighborPosition = new Vector2Int(0, 0);
@@ -630,7 +609,6 @@ public class World : MonoBehaviour
 
             Vector2Int chunkPosition = new Vector2Int(this.meshTerrainJob.chunkPosition.x, this.meshTerrainJob.chunkPosition.y);
 
-            /*
             ChunkObject chunkObject = new ChunkObject(chunkPosition, this.terrainMaterial);
 
             chunkObject.SetRenderer(
@@ -692,87 +670,6 @@ public class World : MonoBehaviour
             }
 
             this.chunkObjects.Add(chunkPosition, chunkObject);
-            */
-
-            GameObject chunkGameObject = new GameObject("Chunk");
-            chunkGameObject.transform.position = new Vector3(chunkPosition.x * 16, 0, chunkPosition.y * 16);
-            chunkGameObject.AddComponent<MeshFilter>();
-            chunkGameObject.AddComponent<MeshRenderer>();
-
-            Mesh mesh = new Mesh();
-            mesh.name = "Chunk Mesh";
-            mesh.indexFormat = UnityEngine.Rendering.IndexFormat.UInt32;
-            mesh.SetVertices(this.meshTerrainJob.vertices.AsArray());
-            mesh.SetNormals(this.meshTerrainJob.normals.AsArray());
-            mesh.SetIndices(this.meshTerrainJob.indices.AsArray(), MeshTopology.Triangles, 0);
-            mesh.SetUVs(0, this.meshTerrainJob.weights1234.AsArray());
-            mesh.SetUVs(1, this.meshTerrainJob.weights5678.AsArray());
-            mesh.SetUVs(2, this.meshTerrainJob.mats1234.AsArray());
-            mesh.SetUVs(3, this.meshTerrainJob.mats5678.AsArray());
-            mesh.SetUVs(4, this.meshTerrainJob.lights.AsArray());
-            mesh.RecalculateBounds();
-
-            for (int i = 0; i < this.meshTerrainJob.breakPoints.Length; i++)
-            {
-                int startPositionVertices = this.meshTerrainJob.breakPoints[i].x;
-                int endPositionVertices;
-                int startPositionIndices = this.meshTerrainJob.breakPoints[i].y;
-                int endPositionIndices;
-
-                if (i < this.meshTerrainJob.breakPoints.Length - 1)
-                {
-                    endPositionVertices = this.meshTerrainJob.breakPoints[i + 1].x;
-                    endPositionIndices = this.meshTerrainJob.breakPoints[i + 1].y;
-                }
-                else
-                {
-                    endPositionVertices = this.meshTerrainJob.vertices.Length;
-                    endPositionIndices = this.meshTerrainJob.indices.Length;
-                }
-
-                if (startPositionVertices == endPositionVertices || startPositionIndices == endPositionIndices)
-                {
-                    continue;
-                }
-
-                int lengthVertices = endPositionVertices - startPositionVertices;
-                int lengthIndices = endPositionIndices - startPositionIndices;
-
-                Mesh colliderMesh = new Mesh();
-
-                Vector3[] colliderVertices = new Vector3[lengthVertices];
-                this.meshTerrainJob.vertices.AsArray().GetSubArray(startPositionVertices, lengthVertices).CopyTo(colliderVertices);
-
-                for (int j = 0; j < lengthVertices; j++)
-                {
-                    colliderVertices[j].y -= i * 16.0f;
-                }
-
-                int[] colliderIndices = new int[lengthIndices];
-                this.meshTerrainJob.indices.AsArray().GetSubArray(startPositionIndices, lengthIndices).CopyTo(colliderIndices);
-
-                int colliderIndicesOffset = startPositionVertices;
-
-                for (int j = 0; j < lengthIndices; j++)
-                {
-                    colliderIndices[j] -= colliderIndicesOffset;
-                }
-
-                colliderMesh.SetVertices(colliderVertices);
-                colliderMesh.SetIndices(colliderIndices, MeshTopology.Triangles, 0);
-
-                colliderMesh.RecalculateBounds();
-
-                GameObject colliderGameObject = new GameObject();
-                colliderGameObject.AddComponent<MeshCollider>();
-                colliderGameObject.GetComponent<MeshCollider>().sharedMesh = colliderMesh;
-                colliderGameObject.transform.position = new Vector3(chunkPosition.x * 16, i * 16, chunkPosition.y * 16);
-            }
-
-            chunkGameObject.GetComponent<MeshFilter>().mesh = mesh;
-            chunkGameObject.GetComponent<MeshRenderer>().material = this.terrainMaterial;
-
-            this.chunkGameObjects.Add(chunkPosition, chunkGameObject);
 
             this.chunks[chunkPosition].areMeshesDone = true;
 
@@ -1153,7 +1050,7 @@ public class World : MonoBehaviour
         Vector2Int chunkPosition = new Vector2Int(editPosition.x, editPosition.y);
         int arrayPosition = editPosition.z;
 
-        if (!this.chunkGameObjects.ContainsKey(chunkPosition) || !this.chunks.ContainsKey(chunkPosition))
+        if (!this.chunkObjects.ContainsKey(chunkPosition) || !this.chunks.ContainsKey(chunkPosition))
             return false;
 
         this.chunks[chunkPosition].SetDensity(arrayPosition, density);
@@ -1283,16 +1180,15 @@ public class World : MonoBehaviour
             bool preventEntering = false;
             if (this.playerChunkPositionLast.x != 2147483647)
             {
-                if (!this.chunkGameObjects.ContainsKey(this.playerChunkPosition))
+                if (!this.chunkObjects.ContainsKey(this.playerChunkPosition))
                 {
-
                     preventEntering = true;
                 }
                 else
                 {
-                    if (!this.chunkGameObjects[this.playerChunkPosition].activeInHierarchy)
+                    if (!this.chunkObjects[this.playerChunkPosition].IsActive())
                     {
-                        preventEntering = true;
+                        this.chunkObjects[this.playerChunkPosition].Activate();
                     }
                 }
             }
@@ -1300,8 +1196,8 @@ public class World : MonoBehaviour
             if (preventEntering)
             {
                 this.playerChunkPosition = this.playerChunkPositionLast;
-                this.playerWorldPosition.position = this.playerWorldPositionLast;
                 this.playerGameObject.GetComponent<PlayerController>().Stop();
+                this.playerGameObject.transform.position = this.playerWorldPositionLast;
                 this.didPlayerEnterChunk = false;
             }
         }

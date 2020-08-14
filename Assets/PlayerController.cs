@@ -56,9 +56,10 @@ public class PlayerController : MonoBehaviour
         this.ToggleRunning();
         this.DetermineSpeed();
 
-        this.transform.Rotate(Vector3.up, Input.GetAxis("Mouse X") * this.mouseSensivity.x * Time.deltaTime);
+        float rotationValue = Input.GetAxis("Mouse X") * this.mouseSensivity.x * 0.01f;
+        this.transform.Rotate(Vector3.up, rotationValue);
 
-        this.cameraRotation -= Input.GetAxis("Mouse Y") * this.mouseSensivity.y * Time.deltaTime;
+        this.cameraRotation -= Input.GetAxis("Mouse Y") * this.mouseSensivity.y * 0.01f;
         this.cameraRotation = Mathf.Clamp(this.cameraRotation, -90.0f, 90.0f);
         this.playerCamera.transform.localRotation = Quaternion.Euler(this.cameraRotation, 0.0f, 0.0f);
 

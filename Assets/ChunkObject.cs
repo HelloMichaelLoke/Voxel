@@ -3,15 +3,18 @@ using System.Collections.Generic;
 using UnityEngine;
 using Unity.Collections;
 
-public struct ChunkObject
+public class ChunkObject
 {
     public GameObject rendererObject;
     public GameObject[] colliderObjects;
     public Mesh rendererMesh;
     public Mesh[] colliderMeshes;
 
+    private bool isActive;
+
     public ChunkObject(Vector2Int chunkPosition, Material material)
     {
+        this.isActive = true;
         this.rendererObject = new GameObject();
         this.rendererObject.name = "Chunk Renderer (" + chunkPosition.x.ToString() + ", " + chunkPosition.y.ToString() + ")";
         this.rendererObject.transform.position = new Vector3(chunkPosition.x * 16.0f, 0.0f, chunkPosition.y * 16.0f);
@@ -21,6 +24,7 @@ public struct ChunkObject
         this.rendererMesh = new Mesh();
         this.rendererMesh.name = "Chunk Renderer Mesh (" + chunkPosition.x.ToString() + ", " + chunkPosition.y.ToString() + ")";
         this.rendererMesh.indexFormat = UnityEngine.Rendering.IndexFormat.UInt32;
+        this.rendererObject.GetComponent<MeshFilter>().sharedMesh = this.rendererMesh;
 
         this.colliderObjects = new GameObject[16];
         this.colliderMeshes = new Mesh[16];
@@ -33,6 +37,36 @@ public struct ChunkObject
             this.colliderObjects[i].SetActive(false);
             this.colliderMeshes[i] = new Mesh();
             this.colliderMeshes[i].name = "Chunk Collider Mesh (" + chunkPosition.x.ToString() + ", " + i + ", " + chunkPosition.y.ToString() + ")";
+        }
+    }
+
+    public bool IsActive()
+    {
+        return this.isActive;
+    }
+
+    public void Activate()
+    {
+        this.isActive = true;
+        this.rendererObject.SetActive(true);
+
+        for (int i = 0; i < 16; i++)
+        {
+            if (this.colliderMeshes[i].vertexCount > 0)
+            {
+                this.colliderObjects[i].SetActive(true);
+            }
+        }
+    }
+
+    public void Deactivate()
+    {
+        this.isActive = false;
+        this.rendererObject.SetActive(false);
+
+        for (int i = 0; i < 16; i++)
+        {
+            this.colliderObjects[i].SetActive(false);
         }
     }
 
@@ -61,13 +95,13 @@ public struct ChunkObject
 
     public void Destroy()
     {
-        Object.Destroy(this.rendererObject);
-        Object.Destroy(this.rendererMesh);
+        UnityEngine.Object.Destroy(this.rendererObject);
+        UnityEngine.Object.Destroy(this.rendererMesh);
 
         for (int i = 0; i < 16; i++)
         {
-            Object.Destroy(this.colliderObjects[i]);
-            Object.Destroy(this.colliderMeshes[i]);
+            UnityEngine.Object.Destroy(this.colliderObjects[i]);
+            UnityEngine.Object.Destroy(this.colliderMeshes[i]);
         }
     }
 };
