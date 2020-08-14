@@ -58,6 +58,11 @@ public class World : MonoBehaviour
     private bool worldEditMeshJobDone = true;
     private Queue<Vector2Int> worldEditMeshQueue = new Queue<Vector2Int>();
 
+    // Light Removal Job
+    private LightRemovalJob lightRemovalJob;
+    private JobHandle lightRemovalJobHandle;
+    private bool lightRemovalJobDone = true;
+
     private bool isUpdateChunkQueuePending = false;
     private Queue<Vector2Int> loadChunkQueue = new Queue<Vector2Int>();
     private Queue<Vector2Int> generateTerrainQueue = new Queue<Vector2Int>();
@@ -786,6 +791,36 @@ public class World : MonoBehaviour
         this.tempSunLightJob.chunk02densities = new NativeArray<sbyte>(65536, Allocator.Persistent);
         this.tempSunLightJob.chunk12densities = new NativeArray<sbyte>(65536, Allocator.Persistent);
         this.tempSunLightJob.chunk22densities = new NativeArray<sbyte>(65536, Allocator.Persistent);
+
+        // Light Removal Job
+        this.lightRemovalJob = new LightRemovalJob()
+        {
+            densities = new NativeArray<sbyte>(589824, Allocator.Persistent),
+            lights = new NativeArray<byte>(589824, Allocator.Persistent),
+            sunLightSpreadQueue = new NativeQueue<int>(Allocator.Persistent),
+            sunLightRemovalQueue = new NativeQueue<int>(Allocator.Persistent),
+            sourceLightRemovalQueue = new NativeQueue<int>(Allocator.Persistent),
+            sourceLightSpreadQueue = new NativeQueue<int>(Allocator.Persistent),
+            chunksTouched = new NativeArray<bool>(9, Allocator.Persistent),
+            densities00 = new NativeArray<sbyte>(65536, Allocator.Persistent),
+            densities10 = new NativeArray<sbyte>(65536, Allocator.Persistent),
+            densities20 = new NativeArray<sbyte>(65536, Allocator.Persistent),
+            densities01 = new NativeArray<sbyte>(65536, Allocator.Persistent),
+            densities11 = new NativeArray<sbyte>(65536, Allocator.Persistent),
+            densities21 = new NativeArray<sbyte>(65536, Allocator.Persistent),
+            densities02 = new NativeArray<sbyte>(65536, Allocator.Persistent),
+            densities12 = new NativeArray<sbyte>(65536, Allocator.Persistent),
+            densities22 = new NativeArray<sbyte>(65536, Allocator.Persistent),
+            lights00 = new NativeArray<byte>(65536, Allocator.Persistent),
+            lights10 = new NativeArray<byte>(65536, Allocator.Persistent),
+            lights20 = new NativeArray<byte>(65536, Allocator.Persistent),
+            lights01 = new NativeArray<byte>(65536, Allocator.Persistent),
+            lights11 = new NativeArray<byte>(65536, Allocator.Persistent),
+            lights21 = new NativeArray<byte>(65536, Allocator.Persistent),
+            lights02 = new NativeArray<byte>(65536, Allocator.Persistent),
+            lights12 = new NativeArray<byte>(65536, Allocator.Persistent),
+            lights22 = new NativeArray<byte>(65536, Allocator.Persistent)
+        };
 
         // Mesh Job
         this.meshTerrainJob = new MeshTerrainJob()
