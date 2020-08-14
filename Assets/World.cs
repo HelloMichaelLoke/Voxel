@@ -1286,27 +1286,30 @@ public class World : MonoBehaviour
 
     private Vector3Int WorldToEditPosition(Vector3 worldPosition)
     {
-        // Voxel Position Relative To Chunk
-        Vector3Int relativePosition = new Vector3Int(0, 0, 0);
-        relativePosition.x = Mathf.RoundToInt(worldPosition.x) % 16;
-        relativePosition.y = Mathf.RoundToInt(worldPosition.y + 1.0f);
-        relativePosition.z = Mathf.RoundToInt(worldPosition.z) % 16;
-        relativePosition.y = Mathf.Clamp(relativePosition.y, 2, 253);
+        Vector3Int roundedPosition = Vector3Int.RoundToInt(worldPosition);
 
-        if (relativePosition.x < 0)
+        Vector3Int relativePosition = new Vector3Int(
+            roundedPosition.x % 16,
+            Mathf.Clamp(roundedPosition.y + 1, 2, 253),
+            roundedPosition.z % 16
+        );
+
+        if (relativePosition.x < 0 && relativePosition.x != 0)
         {
-            relativePosition.x = relativePosition.x + 15;
+            relativePosition.x = relativePosition.x + 16;
         }
-        if (relativePosition.z < 0)
+        if (relativePosition.z < 0 && relativePosition.z != 0)
         {
-            relativePosition.z = relativePosition.z + 15;
+            relativePosition.z = relativePosition.z + 16;
         }
 
         // Chunk Position
         Vector2Int chunkPosition = new Vector2Int(0, 0);
 
-        chunkPosition.x = Mathf.FloorToInt(worldPosition.x / 16.0f);
+        chunkPosition.x = Mathf.FloorToInt(roundedPosition.x / 16.0f);
+        chunkPosition.y = Mathf.FloorToInt(roundedPosition.z / 16.0f);
 
+        /*
         if (Mathf.FloorToInt(worldPosition.x) % 16 == 15 && relativePosition.x == 0)
         {
             chunkPosition.x += 1;
@@ -1326,6 +1329,7 @@ public class World : MonoBehaviour
         {
             chunkPosition.y += 1;
         }
+        */
 
         // Array Position
         int arrayPosition = 0;
@@ -1363,11 +1367,11 @@ public class World : MonoBehaviour
         Vector3 closestPosition = new Vector3(0.0f, -1.0f, 0.0f);
         float minDistance = 10.0f;
 
-        for (int x = -2; x <= 2; x++)
+        for (int x = -1; x <= 1; x++)
         {
-            for (int y = -2; y <= 2; y++)
+            for (int y = -1; y <= 1; y++)
             {
-                for (int z = -2; z <= 2; z++)
+                for (int z = -1; z <= 1; z++)
                 {
                     Vector3 offset = new Vector3(x, y, z);
                     Vector3 roundedPosition = Vector3Int.RoundToInt(worldPosition + offset);
@@ -1383,7 +1387,7 @@ public class World : MonoBehaviour
                     if (solid) isValid = (density < 0);
                     if (!solid) isValid = (density >= 0);
 
-                    if (distance <= minDistance && isValid)
+                    if (distance < minDistance && isValid)
                     {
                         minDistance = distance;
                         closestPosition = roundedPosition;
