@@ -4,7 +4,7 @@ using Unity.Jobs;
 using Unity.Mathematics;
 using UnityEngine;
 
-//[BurstCompile(CompileSynchronously = true)]
+[BurstCompile(CompileSynchronously = true)]
 public struct LightRemovalJob : IJob
 {
     // Temporary Data
@@ -63,6 +63,7 @@ public struct LightRemovalJob : IJob
         this.MergeChunks();
         Debug.Log("merged chunks");
 
+        /*
         int queueCount = this.sunLightSpreadQueue.Count;
         for (int i = 0; i < queueCount; i++)
         {
@@ -87,6 +88,7 @@ public struct LightRemovalJob : IJob
 
             this.sunLightSpreadQueue.Enqueue(indexPeek);
         }
+        */
 
         this.RemoveSunLights();
         this.SpreadSunLights();
@@ -251,14 +253,13 @@ public struct LightRemovalJob : IJob
     {
         while (this.sunLightRemovalQueue.Count > 0)
         {
-            Debug.Log(this.sunLightRemovalQueue.Count);
             int index = this.sunLightRemovalQueue.Dequeue();
             int sunLight = (int)this.GetSunLight(index);
 
             Vector3Int lightPosition = new Vector3Int(
                 index % 48,
                 Mathf.FloorToInt((float)index / 2304.0f),
-                Mathf.FloorToInt(((float)index / 48.0f) % 48)
+                Mathf.FloorToInt(((float)index / 48.0f) % 48.0f)
             );
 
             // Left
@@ -294,7 +295,7 @@ public struct LightRemovalJob : IJob
             // Bottom
             if (lightPosition.y > 0)
             {
-                if (this.GetIndexBottom(index) == 15)
+                if (this.GetSunLight(this.GetIndexBottom(index)) == 15)
                 {
                     this.RemoveSunLight(this.GetIndexBottom(index), 16);
                 }
@@ -386,6 +387,11 @@ public struct LightRemovalJob : IJob
             this.SetSunLight(index, (byte)(sunLight - 1));
             this.sunLightSpreadQueue.Enqueue(index);
         }
+        
+        if (sunLight < (int)this.GetSunLight(index) - 1)
+        {
+            this.sunLightSpreadQueue.Enqueue(index);
+        }
     }
 
     //
@@ -456,35 +462,35 @@ public struct LightRemovalJob : IJob
         {
             this.chunksTouched[0] = true;
         }
-        else if (lightPosition.z <= 17 && lightPosition.x >= 15 && lightPosition.x <= 33)
+        if (lightPosition.z <= 17 && lightPosition.x >= 15 && lightPosition.x <= 33)
         {
             this.chunksTouched[1] = true;
         }
-        else if (lightPosition.z <= 17 && lightPosition.x >= 31)
+        if (lightPosition.z <= 17 && lightPosition.x >= 31)
         {
             this.chunksTouched[2] = true;
         }
-        else if (lightPosition.z >= 15 && lightPosition.z <= 33 && lightPosition.x <= 17)
+        if (lightPosition.z >= 15 && lightPosition.z <= 33 && lightPosition.x <= 17)
         {
             this.chunksTouched[3] = true;
         }
-        else if (lightPosition.z >= 15 && lightPosition.z <= 33 && lightPosition.x >= 15 && lightPosition.x <= 33)
+        if (lightPosition.z >= 15 && lightPosition.z <= 33 && lightPosition.x >= 15 && lightPosition.x <= 33)
         {
             this.chunksTouched[4] = true;
         }
-        else if (lightPosition.z >= 15 && lightPosition.z <= 33 && lightPosition.x >= 31)
+        if (lightPosition.z >= 15 && lightPosition.z <= 33 && lightPosition.x >= 31)
         {
             this.chunksTouched[5] = true;
         }
-        else if (lightPosition.z >= 31 && lightPosition.x <= 17)
+        if (lightPosition.z >= 31 && lightPosition.x <= 17)
         {
             this.chunksTouched[6] = true;
         }
-        else if (lightPosition.z >= 31 && lightPosition.x >= 15 && lightPosition.x <= 33)
+        if (lightPosition.z >= 31 && lightPosition.x >= 15 && lightPosition.x <= 33)
         {
             this.chunksTouched[7] = true;
         }
-        else if (lightPosition.z >= 31 && lightPosition.x >= 31)
+        if (lightPosition.z >= 31 && lightPosition.x >= 31)
         {
             this.chunksTouched[8] = true;
         }

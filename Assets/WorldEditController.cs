@@ -20,7 +20,7 @@ public class WorldEditController : MonoBehaviour
         Ray ray = this.mainCamera.ScreenPointToRay(Input.mousePosition);
         int layerMask = 1 << 8;
 
-        if (Physics.Raycast(ray, out hit, 10.0f, layerMask))
+        if (Physics.Raycast(ray, out hit, 120.0f, layerMask))
         {
             Transform objectHit = hit.transform;
 
