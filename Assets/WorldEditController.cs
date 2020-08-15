@@ -34,13 +34,11 @@ public class WorldEditController : MonoBehaviour
 
                 if (Input.GetMouseButton(0))
                 {
-                    Vector3 worldPosition = this.world.GetClosestVoxelWorldPosition(hit.point, false);
-                    this.world.WorldEditDraw(worldPosition, -1, 3);
+                    this.world.WorldEditDraw(hit.point, (sbyte)-127, (byte)3);
                 }
                 else if (Input.GetMouseButton(1))
                 {
-                    Vector3 worldPosition = this.world.GetClosestVoxelWorldPosition(hit.point, true);
-                    this.world.WorldEditErase(worldPosition);
+                    this.world.WorldEditErase(hit.point);
                 }
             }
         }

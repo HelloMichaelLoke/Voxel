@@ -305,7 +305,7 @@ public struct MeshTerrainJob : IJob
             }
 
             this.lights.Add(new float2(sunLight, sourceLight));
-            this.vertices.Add(vertex - new float3(1.0f, 1.0f, 1.0f));
+            this.vertices.Add(vertex - new float3(1.0f, 0.0f, 1.0f));
             this.normals.Add(normal);
 
             this.mats1234.Add(matIds1234);
