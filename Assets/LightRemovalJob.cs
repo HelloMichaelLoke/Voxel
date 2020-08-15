@@ -61,10 +61,12 @@ public struct LightRemovalJob : IJob
         }
 
         this.MergeChunks();
+        Debug.Log("merged chunks");
 
-        if (this.sunLightSpreadQueue.Count > 0)
+        int queueCount = this.sunLightSpreadQueue.Count;
+        for (int i = 0; i < queueCount; i++)
         {
-            int indexPeek = this.sunLightSpreadQueue.Peek();
+            int indexPeek = this.sunLightSpreadQueue.Dequeue();
             int maxSunLight = 0;
 
             maxSunLight = math.max(maxSunLight, this.GetSunLight(this.GetIndexTop(indexPeek)));
@@ -82,21 +84,20 @@ public struct LightRemovalJob : IJob
             {
                 this.SetSunLight(indexPeek, (byte)(maxSunLight - 1));
             }
+
+            this.sunLightSpreadQueue.Enqueue(indexPeek);
         }
 
         this.RemoveSunLights();
         this.SpreadSunLights();
-
         this.RemoveSourceLights();
         this.SpreadSourceLights();
-
         this.UpdateChunks();
     }
 
     private void MergeChunks()
     {
         int index = 0;
-
         sbyte density = 0;
         byte light = 0;
         int arrayPosition = 0;
@@ -174,129 +175,69 @@ public struct LightRemovalJob : IJob
     private void UpdateChunks()
     {
         int index = 0;
-        int iterator = 0;
+        int index00 = 0;
+        int index10 = 0;
+        int index20 = 0;
+        int index01 = 0;
+        int index11 = 0;
+        int index21 = 0;
+        int index02 = 0;
+        int index12 = 0;
+        int index22 = 0;
 
-        for (int x = 0; x < 16; x++)
+        for (int y = 0; y <= 255; y++)
         {
-            for (int z = 0; z < 16; z++)
+            for (int z = 0; z <= 47; z++)
             {
-                for (int y = 0; y < 256; y++)
+                for (int x = 0; x <= 47; x++)
                 {
-                    index = x + z * 48 + y * 2304;
-                    this.lights00[iterator] = this.lights[index];
-                    iterator++;
-                }
-            }
-        }
+                    if (x >= 0 && x < 16 && z >= 0 && z < 16)
+                    {
+                        lights00[index00] = (byte)lights[index];
+                        index00++;
+                    }
+                    else if (x >= 16 && x < 32 && z >= 0 && z < 16)
+                    {
+                        lights10[index10] = (byte)lights[index];
+                        index10++;
+                    }
+                    else if (x >= 32 && x < 48 && z >= 0 && z < 16)
+                    {
+                        lights20[index20] = (byte)lights[index];
+                        index20++;
+                    }
+                    else if (x >= 0 && x < 16 && z >= 16 && z < 32)
+                    {
+                        lights01[index01] = (byte)lights[index];
+                        index01++;
+                    }
+                    else if (x >= 16 && x < 32 && z >= 16 && z < 32)
+                    {
+                        lights11[index11] = (byte)lights[index];
+                        index11++;
+                    }
+                    else if (x >= 32 && x < 48 && z >= 16 && z < 32)
+                    {
+                        lights21[index21] = (byte)lights[index];
+                        index21++;
+                    }
+                    else if (x >= 0 && x < 16 && z >= 32 && z < 48)
+                    {
+                        lights02[index02] = (byte)lights[index];
+                        index02++;
+                    }
+                    else if (x >= 16 && x < 32 && z >= 32 && z < 48)
+                    {
+                        lights12[index12] = (byte)lights[index];
+                        index12++;
+                    }
+                    else if (x >= 32 && x < 48 && z >= 32 && z < 48)
+                    {
+                        lights22[index22] = (byte)lights[index];
+                        index22++;
+                    }
 
-        iterator = 0;
-        for (int x = 16; x < 32; x++)
-        {
-            for (int z = 0; z < 16; z++)
-            {
-                for (int y = 0; y < 256; y++)
-                {
-                    index = x + z * 48 + y * 2304;
-                    this.lights10[iterator] = this.lights[index];
-                    iterator++;
-                }
-            }
-        }
-
-        iterator = 0;
-        for (int x = 32; x < 48; x++)
-        {
-            for (int z = 0; z < 16; z++)
-            {
-                for (int y = 0; y < 256; y++)
-                {
-                    index = x + z * 48 + y * 2304;
-                    this.lights20[iterator] = this.lights[index];
-                    iterator++;
-                }
-            }
-        }
-
-        iterator = 0;
-        for (int x = 0; x < 16; x++)
-        {
-            for (int z = 16; z < 32; z++)
-            {
-                for (int y = 0; y < 256; y++)
-                {
-                    index = x + z * 48 + y * 2304;
-                    this.lights01[iterator] = this.lights[index];
-                    iterator++;
-                }
-            }
-        }
-
-        iterator = 0;
-        for (int x = 16; x < 32; x++)
-        {
-            for (int z = 16; z < 32; z++)
-            {
-                for (int y = 0; y < 256; y++)
-                {
-                    index = x + z * 48 + y * 2304;
-                    this.lights11[iterator] = this.lights[index];
-                    iterator++;
-                }
-            }
-        }
-
-        iterator = 0;
-        for (int x = 32; x < 48; x++)
-        {
-            for (int z = 16; z < 32; z++)
-            {
-                for (int y = 0; y < 256; y++)
-                {
-                    index = x + z * 48 + y * 2304;
-                    this.lights21[iterator] = this.lights[index];
-                    iterator++;
-                }
-            }
-        }
-
-        iterator = 0;
-        for (int x = 0; x < 16; x++)
-        {
-            for (int z = 32; z < 48; z++)
-            {
-                for (int y = 0; y < 256; y++)
-                {
-                    index = x + z * 48 + y * 2304;
-                    this.lights02[iterator] = this.lights[index];
-                    iterator++;
-                }
-            }
-        }
-
-        iterator = 0;
-        for (int x = 16; x < 32; x++)
-        {
-            for (int z = 32; z < 48; z++)
-            {
-                for (int y = 0; y < 256; y++)
-                {
-                    index = x + z * 48 + y * 2304;
-                    this.lights12[iterator] = this.lights[index];
-                    iterator++;
-                }
-            }
-        }
-
-        iterator = 0;
-        for (int x = 32; x < 48; x++)
-        {
-            for (int z = 32; z < 48; z++)
-            {
-                for (int y = 0; y < 256; y++)
-                {
-                    index = x + z * 48 + y * 2304;
-                    this.lights22[iterator] = this.lights[index];
-                    iterator++;
+                    index++;
                 }
             }
         }
@@ -310,43 +251,57 @@ public struct LightRemovalJob : IJob
     {
         while (this.sunLightRemovalQueue.Count > 0)
         {
+            Debug.Log(this.sunLightRemovalQueue.Count);
             int index = this.sunLightRemovalQueue.Dequeue();
             int sunLight = (int)this.GetSunLight(index);
 
+            Vector3Int lightPosition = new Vector3Int(
+                index % 48,
+                Mathf.FloorToInt((float)index / 2304.0f),
+                Mathf.FloorToInt(((float)index / 48.0f) % 48)
+            );
+
             // Left
-            if (index % 48 != 0)
+            if (lightPosition.x > 0)
             {
                 this.RemoveSunLight(this.GetIndexLeft(index), sunLight);
             }
 
             // Right
-            if (index % 48 != 47)
+            if (lightPosition.x < 47)
             {
                 this.RemoveSunLight(this.GetIndexRight(index), sunLight);
             }
 
             // Front
-            if (index % 2304 < 2256)
+            if (lightPosition.z < 47)
             {
                 this.RemoveSunLight(this.GetIndexFront(index), sunLight);
             }
 
             // Back
-            if (index % 2304 >= 48)
+            if (lightPosition.z > 0)
             {
                 this.RemoveSunLight(this.GetIndexBack(index), sunLight);
             }
 
             // Top
-            if (index < 9434880)
+            if (lightPosition.y < 255)
             {
                 this.RemoveSunLight(this.GetIndexTop(index), sunLight);
             }
 
             // Bottom
-            if (index >= 2304)
+            if (lightPosition.y > 0)
             {
-                this.RemoveSunLight(this.GetIndexBottom(index), sunLight);
+                if (this.GetIndexBottom(index) == 15)
+                {
+                    this.RemoveSunLight(this.GetIndexBottom(index), 16);
+                }
+                else
+                {
+                    this.RemoveSunLight(this.GetIndexBottom(index), sunLight);
+                }
             }
 
             // Set 0
@@ -356,9 +311,8 @@ public struct LightRemovalJob : IJob
 
     private void RemoveSunLight(int index, int sunLight)
     {
-        if (sunLight >= (int)this.GetSunLight(index))
+        if ((int)this.GetSunLight(index) < sunLight)
         {
-            this.SetSunLight(index, 0);
             this.sunLightRemovalQueue.Enqueue(index);
         }
         else
@@ -374,38 +328,44 @@ public struct LightRemovalJob : IJob
             int index = this.sunLightSpreadQueue.Dequeue();
             int sunLight = this.GetSunLight(index);
 
+            Vector3Int lightPosition = new Vector3Int(
+                index % 48,
+                Mathf.FloorToInt((float)index / 2304.0f),
+                Mathf.FloorToInt((float)index / 48.0f) % 48
+            );
+
             // Left
-            if (index % 48 != 0)
+            if (lightPosition.x > 0)
             {
                 this.SpreadSunLight(this.GetIndexLeft(index), sunLight);
             }
 
             // Right
-            if (index % 48 != 47)
+            if (lightPosition.x < 47)
             {
                 this.SpreadSunLight(this.GetIndexRight(index), sunLight);
             }
 
             // Front
-            if (index % 2304 < 2256)
+            if (lightPosition.z < 47)
             {
                 this.SpreadSunLight(this.GetIndexFront(index), sunLight);
             }
 
             // Back
-            if (index % 2304 >= 48)
+            if (lightPosition.z > 0)
             {
                 this.SpreadSunLight(this.GetIndexBack(index), sunLight);
             }
 
             // Top
-            if (index < 9434880)
+            if (lightPosition.y < 255)
             {
                 this.SpreadSunLight(this.GetIndexTop(index), sunLight);
             }
 
             // Bottom
-            if (index % 2304 > 0)
+            if (lightPosition.y > 0)
             {
                 if (sunLight == 15)
                 {
@@ -486,43 +446,49 @@ public struct LightRemovalJob : IJob
 
     private void TouchChunk(int index)
     {
-        Vector2Int chunkPosition = new Vector2Int();
-        chunkPosition.x = Mathf.FloorToInt((float)(index % 48) / 16.0f);
-        chunkPosition.y = Mathf.FloorToInt((float)((index / 48) % 48) / 16.0f);
+        Vector3Int lightPosition = new Vector3Int(
+            index % 48,
+            Mathf.FloorToInt((float)index / 2304.0f),
+            Mathf.FloorToInt((float)index / 48.0f) % 48
+        );
 
-        if (chunkPosition.x == -1 && chunkPosition.y == -1)
+        Vector2Int chunkPosition = new Vector2Int();
+        chunkPosition.x = Mathf.FloorToInt((float)lightPosition.x / 16.0f);
+        chunkPosition.y = Mathf.FloorToInt((float)lightPosition.z / 16.0f);
+
+        if (chunkPosition.x == 0 && chunkPosition.y == 0)
         {
             this.chunksTouched[0] = true;
         }
-        else if (chunkPosition.x == 0 && chunkPosition.y == -1)
+        else if (chunkPosition.x == 1 && chunkPosition.y == 0)
         {
             this.chunksTouched[1] = true;
         }
-        else if (chunkPosition.x == 1 && chunkPosition.y == -1)
+        else if (chunkPosition.x == 2 && chunkPosition.y == 0)
         {
             this.chunksTouched[2] = true;
         }
-        else if (chunkPosition.x == -1 && chunkPosition.y == 0)
+        else if (chunkPosition.x == 0 && chunkPosition.y == 1)
         {
             this.chunksTouched[3] = true;
         }
-        else if (chunkPosition.x == 0 && chunkPosition.y == 0)
+        else if (chunkPosition.x == 1 && chunkPosition.y == 1)
         {
             this.chunksTouched[4] = true;
         }
-        else if (chunkPosition.x == 1 && chunkPosition.y == 0)
+        else if (chunkPosition.x == 2 && chunkPosition.y == 1)
         {
             this.chunksTouched[5] = true;
         }
-        else if (chunkPosition.x == -1 && chunkPosition.y == 1)
+        else if (chunkPosition.x == 0 && chunkPosition.y == 2)
         {
             this.chunksTouched[6] = true;
         }
-        else if (chunkPosition.x == 0 && chunkPosition.y == 1)
+        else if (chunkPosition.x == 1 && chunkPosition.y == 2)
         {
             this.chunksTouched[7] = true;
         }
-        else if (chunkPosition.x == 1 && chunkPosition.y == 1)
+        else if (chunkPosition.x == 2 && chunkPosition.y == 2)
         {
             this.chunksTouched[8] = true;
         }
