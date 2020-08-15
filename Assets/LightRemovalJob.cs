@@ -452,43 +452,39 @@ public struct LightRemovalJob : IJob
             Mathf.FloorToInt((float)index / 48.0f) % 48
         );
 
-        Vector2Int chunkPosition = new Vector2Int();
-        chunkPosition.x = Mathf.FloorToInt((float)lightPosition.x / 16.0f);
-        chunkPosition.y = Mathf.FloorToInt((float)lightPosition.z / 16.0f);
-
-        if (chunkPosition.x == 0 && chunkPosition.y == 0)
+        if (lightPosition.z <= 17 && lightPosition.x <= 17)
         {
             this.chunksTouched[0] = true;
         }
-        else if (chunkPosition.x == 1 && chunkPosition.y == 0)
+        else if (lightPosition.z <= 17 && lightPosition.x >= 15 && lightPosition.x <= 33)
         {
             this.chunksTouched[1] = true;
         }
-        else if (chunkPosition.x == 2 && chunkPosition.y == 0)
+        else if (lightPosition.z <= 17 && lightPosition.x >= 31)
         {
             this.chunksTouched[2] = true;
         }
-        else if (chunkPosition.x == 0 && chunkPosition.y == 1)
+        else if (lightPosition.z >= 15 && lightPosition.z <= 33 && lightPosition.x <= 17)
         {
             this.chunksTouched[3] = true;
         }
-        else if (chunkPosition.x == 1 && chunkPosition.y == 1)
+        else if (lightPosition.z >= 15 && lightPosition.z <= 33 && lightPosition.x >= 15 && lightPosition.x <= 33)
         {
             this.chunksTouched[4] = true;
         }
-        else if (chunkPosition.x == 2 && chunkPosition.y == 1)
+        else if (lightPosition.z >= 15 && lightPosition.z <= 33 && lightPosition.x >= 31)
         {
             this.chunksTouched[5] = true;
         }
-        else if (chunkPosition.x == 0 && chunkPosition.y == 2)
+        else if (lightPosition.z >= 31 && lightPosition.x <= 17)
         {
             this.chunksTouched[6] = true;
         }
-        else if (chunkPosition.x == 1 && chunkPosition.y == 2)
+        else if (lightPosition.z >= 31 && lightPosition.x >= 15 && lightPosition.x <= 33)
         {
             this.chunksTouched[7] = true;
         }
-        else if (chunkPosition.x == 2 && chunkPosition.y == 2)
+        else if (lightPosition.z >= 31 && lightPosition.x >= 31)
         {
             this.chunksTouched[8] = true;
         }
