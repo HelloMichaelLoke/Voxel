@@ -76,8 +76,6 @@
                 {
                     float3 weight = abs(i.worldNormal);
                     weight /= weight.x + weight.y + weight.z;
-
-                    
                     
                     ////////////////////////////////////////////////////////////////////////////////////
                     /*
@@ -347,7 +345,15 @@
                     float3 albedo = albedoX + albedoY + albedoZ;
 
                     float light = max(i.light.x * _SunLight, i.light.y);
-                    
+                    float camDist = distance(_WorldSpaceCameraPos, (i.worldPos / _TexScale));
+
+                    float lightThreshold = 0.1;
+                    if (camDist < 10.0 && light < lightThreshold)
+                    {
+                        float lerpValue = (camDist / 10.0);
+                        light = lerpValue * light + (1.0 - lerpValue) * lightThreshold;
+                    }
+
                     float3 color = (_TexBrightness + (1.0 - _TexBrightness) * light) * albedo;
 
                     return float4(color.x, color.y, color.z, 1.0);
@@ -355,5 +361,5 @@
                 ENDCG
             }
         }
-            FallBack "Diffuse"
+    FallBack "Diffuse"
 }

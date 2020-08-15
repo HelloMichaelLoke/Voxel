@@ -29,17 +29,20 @@ public class WorldEditController : MonoBehaviour
                 this.visualizer.SetActive(true);
                 this.visualizer.transform.position = hit.point;
 
+                if (Vector3.Distance(hit.point, this.transform.position) >= 2.0f)
+                {
+                    if (Input.GetMouseButton(0))
+                    {
+                        this.world.WorldEditDraw(hit.point, (sbyte)-128, (byte)3);
+                    }
+                    else if (Input.GetMouseButton(1))
+                    {
+                        this.world.WorldEditErase(hit.point);
+                    }
+                }
+
                 //this.visualizerClosest.SetActive(true);
                 //this.visualizerClosest.transform.position = worldPosition;
-
-                if (Input.GetMouseButton(0))
-                {
-                    this.world.WorldEditDraw(hit.point, (sbyte)-127, (byte)3);
-                }
-                else if (Input.GetMouseButton(1))
-                {
-                    this.world.WorldEditErase(hit.point);
-                }
             }
         }
         else

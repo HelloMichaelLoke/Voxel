@@ -280,8 +280,8 @@ public struct MeshTerrainJob : IJob
             float weight0 = (float)t / 256.0f;
             float weight1 = (float)u / 256.0f;
 
-            if (weight0 >= 0.90f) { weight0 = 0.90f; weight1 = 0.1f; }
-            if (weight1 >= 0.90f) { weight1 = 0.90f; weight0 = 0.1f; }
+            if (weight0 >= 0.80f) { weight0 = 0.90f; weight1 = 0.1f; }
+            if (weight1 >= 0.80f) { weight1 = 0.90f; weight0 = 0.1f; }
 
             float3 vertex;
             vertex = weight0 * position0 + weight1 * position1;
@@ -295,7 +295,6 @@ public struct MeshTerrainJob : IJob
             if (density0 < density1)
             {
                 materialId = (float)material0;
-
                 if (material1 != 255)
                     materialId = (float)material1;
             }

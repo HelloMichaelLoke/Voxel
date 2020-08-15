@@ -283,8 +283,6 @@ public class World : MonoBehaviour
 
             Vector3Int relativePosition = editPosition.relativePosition;
 
-            Debug.Log(relativePosition);
-
             if (relativePosition.z <= 1 && relativePosition.x <= 1)
                 this.worldEditMeshesTouched[0] = true;
 
@@ -326,8 +324,6 @@ public class World : MonoBehaviour
 
                 return;
             }
-
-            Debug.Log("lights changed");
 
             // Queue light changes
             foreach (VoxelChange voxelChange in voxelChanges)
@@ -1444,8 +1440,6 @@ public class World : MonoBehaviour
         WorldEditData worldEditData = new WorldEditData(editPosition, voxelChanges);
 
         this.worldEditQueue.Enqueue(worldEditData);
-
-        Debug.Log(editPosition.roundedPosition);
 
         return true;
     }

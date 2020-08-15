@@ -61,35 +61,6 @@ public struct LightRemovalJob : IJob
         }
 
         this.MergeChunks();
-        Debug.Log("merged chunks");
-
-        /*
-        int queueCount = this.sunLightSpreadQueue.Count;
-        for (int i = 0; i < queueCount; i++)
-        {
-            int indexPeek = this.sunLightSpreadQueue.Dequeue();
-            int maxSunLight = 0;
-
-            maxSunLight = math.max(maxSunLight, this.GetSunLight(this.GetIndexTop(indexPeek)));
-            maxSunLight = math.max(maxSunLight, this.GetSunLight(this.GetIndexBottom(indexPeek)));
-            maxSunLight = math.max(maxSunLight, this.GetSunLight(this.GetIndexLeft(indexPeek)));
-            maxSunLight = math.max(maxSunLight, this.GetSunLight(this.GetIndexRight(indexPeek)));
-            maxSunLight = math.max(maxSunLight, this.GetSunLight(this.GetIndexFront(indexPeek)));
-            maxSunLight = math.max(maxSunLight, this.GetSunLight(this.GetIndexBack(indexPeek)));
-
-            if (this.GetSunLight(this.GetIndexTop(indexPeek)) == 15)
-            {
-                this.SetSunLight(indexPeek, (byte)15);
-            }
-            else
-            {
-                this.SetSunLight(indexPeek, (byte)(maxSunLight - 1));
-            }
-
-            this.sunLightSpreadQueue.Enqueue(indexPeek);
-        }
-        */
-
         this.RemoveSunLights();
         this.SpreadSunLights();
         this.RemoveSourceLights();
