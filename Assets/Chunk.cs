@@ -88,6 +88,11 @@ public class Chunk
         return this.lights;
     }
 
+    public void SetLightsFromNative(NativeArray<byte> lights)
+    {
+        lights.CopyTo(this.lights);
+    }
+
     //
     // Sun Lights
     //
