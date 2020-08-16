@@ -287,7 +287,8 @@ public struct MeshTerrainJob : IJob
             vertex = weight0 * position0 + weight1 * position1;
 
             float3 normal = weight0 * normal0 + weight1 * normal1;
-            float sunLight = weight0 * sunLight0 + weight1 * sunLight1;
+            //float sunLight = weight0 * sunLight0 + weight1 * sunLight1;
+            float sunLight = math.max(sunLight0, sunLight1);
 
             float sourceLight = weight0 * sourceLight0 + weight1 * sourceLight1;
 
@@ -339,6 +340,9 @@ public struct MeshTerrainJob : IJob
     {
         int sunLight = 0;
 
+        sunLight = math.max(sunLight, (int)((chunkLights[index] >> 4) & 0xF));
+
+        /*
         sunLight = math.max(sunLight, (int)((chunkLights[index - 381] >> 4) & 0xF));
         sunLight = math.max(sunLight, (int)((chunkLights[index - 362] >> 4) & 0xF));
         sunLight = math.max(sunLight, (int)((chunkLights[index - 343] >> 4) & 0xF));
@@ -366,6 +370,7 @@ public struct MeshTerrainJob : IJob
         sunLight = math.max(sunLight, (int)((chunkLights[index + 343] >> 4) & 0xF));
         sunLight = math.max(sunLight, (int)((chunkLights[index + 362] >> 4) & 0xF));
         sunLight = math.max(sunLight, (int)((chunkLights[index + 381] >> 4) & 0xF));
+        */
 
         /*
         sunLight = math.max(sunLight, (int)((chunkLights[index + 1] >> 4) & 0xF));
