@@ -31,11 +31,11 @@ public class WorldEditController : MonoBehaviour
 
                 if (Vector3.Distance(hit.point, this.transform.position) >= 2.0f)
                 {
-                    if (Input.GetMouseButton(0))
+                    if (Input.GetMouseButtonDown(0))
                     {
                         this.world.WorldEditDraw(hit.point, (sbyte)-128, (byte)3);
                     }
-                    else if (Input.GetMouseButton(1))
+                    else if (Input.GetMouseButtonDown(1))
                     {
                         this.world.WorldEditErase(hit.point);
                     }

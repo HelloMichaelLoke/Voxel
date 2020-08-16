@@ -114,13 +114,34 @@ public struct GenerateTerrainJob : IJob
 
                         if (caveNoise < 0.0f)
                         {
-                            density = (sbyte)math.round(127.0f * caveNoise);
-                            density -= 1;
+                            float caveNoiseAbove = GetCaves(new float3(x, y + 1.0f, z));
+
+                            if (caveNoiseAbove >= 0.0f)
+                            {
+                                density = (sbyte)math.round(127.0f * caveNoise);
+                                density -= 1;
+                            }
+                            else
+                            {
+                                density = -128;
+                            }
+                            
                             material = (byte)math.round((noise.snoise(new float3(x, y, z) * 0.1f) + 1.0f) / 2.0f * 3.0f);
                         }
                         else
                         {
-                            density = (sbyte)math.round(127.0f * caveNoise);
+                            float caveNoiseBelow = GetCaves(new float3(x, y - 1.0f, z));
+
+                            if (caveNoiseBelow < 0.0f)
+                            {
+                                density = (sbyte)math.round(127.0f * caveNoiseBelow);
+                                density += 127;
+                            }
+                            else
+                            {
+                                density = 127;
+                            }
+                            
                             material = 255;
                         }
                     }

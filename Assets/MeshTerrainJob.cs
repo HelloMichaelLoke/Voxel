@@ -89,7 +89,7 @@ public struct MeshTerrainJob : IJob
         sbyte density = 0;
         byte material = 0;
         byte light = 0;
-        int arrayPosition = 0;
+        int arrayPosition;
 
         for (int y = 0; y <= 255; y++)
         {
@@ -274,21 +274,91 @@ public struct MeshTerrainJob : IJob
             float sourceLight0 = this.cornerLights[index0].y;
             float sourceLight1 = this.cornerLights[index1].y;
 
-            int t = (density1 << 8) / (density1 - density0);
-            int u = 256 - t;
+            /*
+            int t  = (density1 << 8) / (density1 - density0);
+            int u = 255 - t;
 
-            float weight0 = (float)t / 256.0f;
-            float weight1 = (float)u / 256.0f;
+            float weight0 = (float)t / 255.0f;
+            float weight1 = (float)u / 255.0f;
+            */
 
-            if (weight0 >= 0.80f) { weight0 = 0.90f; weight1 = 0.1f; }
-            if (weight1 >= 0.80f) { weight1 = 0.90f; weight0 = 0.1f; }
+            float d0 = (float)density0;
+            float d1 = (float)density1;
+
+            if (d0 >= 0) d0++;
+            if (d1 >= 0) d1++;
+
+            float dist = math.abs(d0 - d1);
+            float distA = math.abs(d0);
+            float distB = math.abs(d1);
+
+            float weight1 = distA / dist;
+            float weight0 = distB / dist;
+
+            //if (weight0 >= 0.50f) { weight0 = 0.50f; weight1 = 0.50f; }
+            //if (weight1 >= 0.50f) { weight1 = 0.50f; weight0 = 0.50f; }
+
+            /*
+            if ((position0.x == position1.x) && (position0.z == position1.z))
+            {
+                if (position0.y > position1.y && density0 < density1)
+                {
+                    if (density0 > density1)
+                    {
+                        weight0 = 0.0f;
+                        weight1 = 1.0f;
+                    }
+                }
+
+                if (position0.y < position1.y && density1 < density0)
+                {
+                    if (density0 > density1)
+                    {
+                        weight0 = 0.0f;
+                        weight1 = 1.0f;
+                    }
+                }
+            }
+            else
+            {
+                if (position0.y == position1.y)
+                {
+                    if (density0 < density1)
+                    {
+                        weight0 = 0.0f;
+                        weight1 = 1.0f;
+                    }
+
+                    if (density1 < density0)
+                    {
+                        weight0 = 1.0f;
+                        weight1 = 0.0f;
+                    }
+                }
+            }
+            */
 
             float3 vertex;
-            vertex = weight0 * position0 + weight1 * position1;
+            vertex = weight1 * position0 + weight0 * position1;
+            float3 normal = weight1 * normal0 + weight0 * normal1;
 
-            float3 normal = weight0 * normal0 + weight1 * normal1;
-            //float sunLight = weight0 * sunLight0 + weight1 * sunLight1;
-            float sunLight = math.max(sunLight0, sunLight1);
+            float sunLight = 0.0f;
+
+            if (sunLight0 == 0.0f && sunLight1 > 0.0f)
+            {
+                sunLight = sunLight1 - weight1;
+            }
+            
+            if (sunLight1 == 0.0f && sunLight0 > 0.0f)
+            {
+                sunLight = sunLight0 - weight0;
+            }
+
+            /*
+            Debug.Log("sunLight0: " + sunLight0);
+            Debug.Log("sunLight1: " + sunLight1);
+            Debug.Log("sunLight: " + sunLight);
+            */
 
             float sourceLight = weight0 * sourceLight0 + weight1 * sourceLight1;
 
@@ -304,7 +374,7 @@ public struct MeshTerrainJob : IJob
                 materialId = (float)material1;
             }
 
-            this.lights.Add(new float2(sunLight, sourceLight));
+            this.lights.Add(new float2(sunLight / 15.0f, sourceLight / 15.0f));
             this.vertices.Add(vertex - new float3(1.0f, 0.0f, 1.0f));
             this.normals.Add(normal);
 
@@ -338,9 +408,9 @@ public struct MeshTerrainJob : IJob
 
     private float2 GetLight(int index)
     {
-        int sunLight = 0;
+        float sunLight = 0.0f;
 
-        sunLight = math.max(sunLight, (int)((chunkLights[index] >> 4) & 0xF));
+        sunLight = (float)((this.chunkLights[index] >> 4) & 0xF);
 
         /*
         sunLight = math.max(sunLight, (int)((chunkLights[index - 381] >> 4) & 0xF));
@@ -372,6 +442,7 @@ public struct MeshTerrainJob : IJob
         sunLight = math.max(sunLight, (int)((chunkLights[index + 381] >> 4) & 0xF));
         */
 
+
         /*
         sunLight = math.max(sunLight, (int)((chunkLights[index + 1] >> 4) & 0xF));
         sunLight = math.max(sunLight, (int)((chunkLights[index - 1] >> 4) & 0xF));
@@ -381,8 +452,11 @@ public struct MeshTerrainJob : IJob
         sunLight = math.max(sunLight, (int)((chunkLights[index - 361] >> 4) & 0xF));
         */
 
-        int sourceLight = 0;
+        float sourceLight = 0.0f;
 
+        sourceLight = (float)(chunkLights[index] & 0xF);
+
+        /*
         sourceLight = math.max(sourceLight, (int)(chunkLights[index - 381] & 0xF));
         sourceLight = math.max(sourceLight, (int)(chunkLights[index - 362] & 0xF));
         sourceLight = math.max(sourceLight, (int)(chunkLights[index - 343] & 0xF));
@@ -410,14 +484,46 @@ public struct MeshTerrainJob : IJob
         sourceLight = math.max(sourceLight, (int)(chunkLights[index + 343] & 0xF));
         sourceLight = math.max(sourceLight, (int)(chunkLights[index + 362] & 0xF));
         sourceLight = math.max(sourceLight, (int)(chunkLights[index + 381] & 0xF));
+        */
 
-        return new float2((float)sunLight / 15.0f, (float)sourceLight / 15.0f);
+        return new float2(sunLight, sourceLight);
     }
 
     private float3 GetNormal(int index)
     {
         float3 normal = new float3(0.0f, 0.0f, 0.0f);
 
+        for (int x = -1; x <= 1; x++)
+        {
+            for (int y = -1; y <= 1; y++)
+            {
+                for (int z = -1; z <= 1; z++)
+                {
+                    if (math.abs(x) == 1.0f && math.abs(z) == 1.0f)
+                        continue;
+
+                    int arrayPosition = x + y * 361 + z * 19;
+                    arrayPosition = index + arrayPosition;
+
+                    float3 offset = new float3(x, y, z);
+                    float weight = chunkDensities[arrayPosition];
+
+                    if (weight >= 0.0f)
+                    {
+                        weight = 1.0f;
+                    }
+                    else
+                    {
+                        weight = -1.0f;
+                    }
+
+                    normal += offset * weight;
+                }
+            }
+        }
+
+
+        /*
         normal += new float3(-1.0f, -1.0f, -1.0f) * (float)chunkDensities[index - 381];
         normal += new float3(-1.0f, -1.0f, 0.0f) * (float)chunkDensities[index - 362];
         normal += new float3(-1.0f, -1.0f, 1.0f) * (float)chunkDensities[index - 343];
@@ -444,7 +550,13 @@ public struct MeshTerrainJob : IJob
         normal += new float3(1.0f, 1.0f, -1.0f) * (float)chunkDensities[index + 343];
         normal += new float3(1.0f, 1.0f, 0.0f) * (float)chunkDensities[index + 362];
         normal += new float3(1.0f, 1.0f, 1.0f) * (float)chunkDensities[index + 381];
+        */
 
-        return math.normalize(normal);
+        if (!(normal.x == 0.0f && normal.y == 0.0f && normal.z == 0.0f))
+        {
+            normal = math.normalize(normal);
+        }
+
+        return normal;
     }
 }
