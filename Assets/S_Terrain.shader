@@ -354,11 +354,12 @@
                         light = lerpValue * light + (1.0 - lerpValue) * lightThreshold;
                     }
 
+                    //light = pow(light, 1.0 / 2.2);
                     float3 color = (_TexBrightness + (1.0 - _TexBrightness) * light) * albedo;
 
                     //color = i.worldNormal;
-                    color = float3(1.0, 1.0, 1.0) * light;
-                    //color = pow(light, 1.0 / 2.2);
+                    //color = float3(1.0, 1.0, 1.0) * light;
+                    
 
                     return float4(color.x, color.y, color.z, 1.0);
                 }

@@ -10,43 +10,31 @@ using Unity.Mathematics;
 public struct MeshTerrainJob : IJob
 {
     // Temporary Data
-    public NativeArray<sbyte>   chunkDensities;
-    public NativeArray<byte>    chunkMaterials;
-    public NativeArray<byte>    chunkLights;
+    public NativeArray<Voxel> voxelsMerged;
+    public NativeArray<byte> lightsMerged;
 
     // Chunk Data
-    public int2     chunkPosition;
-    public float3   chunkSize;
-    public float3   chunkSizeFull;
+    public int2 chunkPosition;
 
     // Terrain Data
-    public NativeArray<sbyte>   chunk00densities;
-    public NativeArray<byte>    chunk00materials;
-    public NativeArray<byte>    chunk00lights;
-    public NativeArray<sbyte>   chunk10densities;
-    public NativeArray<byte>    chunk10materials;
-    public NativeArray<byte>    chunk10lights;
-    public NativeArray<sbyte>   chunk20densities;
-    public NativeArray<byte>    chunk20materials;
-    public NativeArray<byte>    chunk20lights;
-    public NativeArray<sbyte>   chunk01densities;
-    public NativeArray<byte>    chunk01materials;
-    public NativeArray<byte>    chunk01lights;
-    public NativeArray<sbyte>   chunk11densities;
-    public NativeArray<byte>    chunk11materials;
-    public NativeArray<byte>    chunk11lights;
-    public NativeArray<sbyte>   chunk21densities;
-    public NativeArray<byte>    chunk21materials;
-    public NativeArray<byte>    chunk21lights;
-    public NativeArray<sbyte>   chunk02densities;
-    public NativeArray<byte>    chunk02materials;
-    public NativeArray<byte>    chunk02lights;
-    public NativeArray<sbyte>   chunk12densities;
-    public NativeArray<byte>    chunk12materials;
-    public NativeArray<byte>    chunk12lights;
-    public NativeArray<sbyte>   chunk22densities;
-    public NativeArray<byte>    chunk22materials;
-    public NativeArray<byte>    chunk22lights;
+    public NativeArray<Voxel>   voxels00;
+    public NativeArray<byte>    lights00;
+    public NativeArray<Voxel>   voxels10;
+    public NativeArray<byte>    lights10;
+    public NativeArray<Voxel>   voxels20;
+    public NativeArray<byte>    lights20;
+    public NativeArray<Voxel>   voxels01;
+    public NativeArray<byte>    lights01;
+    public NativeArray<Voxel>   voxels11;
+    public NativeArray<byte>    lights11;
+    public NativeArray<Voxel>   voxels21;
+    public NativeArray<byte>    lights21;
+    public NativeArray<Voxel>   voxels02;
+    public NativeArray<byte>    lights02;
+    public NativeArray<Voxel>   voxels12;
+    public NativeArray<byte>    lights12;
+    public NativeArray<Voxel>   voxels22;
+    public NativeArray<byte>    lights22;
 
     // Mesh Data
     public NativeList<Vector3> vertices;
@@ -67,8 +55,7 @@ public struct MeshTerrainJob : IJob
 
     // Temporary Variables
     public NativeArray<float3> cornerPositions;
-    public NativeArray<sbyte> cornerDensities;
-    public NativeArray<byte> cornerMaterials;
+    public NativeArray<Voxel> cornerVoxels;
     public NativeArray<float2> cornerLights;
     public NativeArray<float3> cornerNormals;
     public NativeList<int> cellIndices;
@@ -85,11 +72,8 @@ public struct MeshTerrainJob : IJob
 
     private void MergeChunks()
     {
-        int index = 0;
-        sbyte density = 0;
-        byte material = 0;
-        byte light = 0;
-        int arrayPosition;
+        int i = 0;
+        int index;
 
         for (int y = 0; y <= 255; y++)
         {
@@ -97,75 +81,68 @@ public struct MeshTerrainJob : IJob
             {
                 for (int x = 0; x <= 18; x++)
                 {
+                    Voxel voxel = new Voxel();
+                    byte light = 0;
+
                     if (x == 0 && z == 0)
                     {
-                        arrayPosition = 255 + y * 256;
-                        density = chunk00densities[arrayPosition];
-                        material = chunk00materials[arrayPosition];
-                        light = chunk00lights[arrayPosition];
+                        index = 255 + y * 256;
+                        voxel = this.voxels00[index];
+                        light = this.lights00[index];
                     }
                     else if (x == 0 && z >= 1 && z <= 16)
                     {
-                        arrayPosition = 15 + ((z - 1) * 16) + y * 256;
-                        density = chunk01densities[arrayPosition];
-                        material = chunk01materials[arrayPosition];
-                        light = chunk01lights[arrayPosition];
+                        index = 15 + ((z - 1) * 16) + y * 256;
+                        voxel = this.voxels01[index];
+                        light = this.lights01[index];
                     }
                     else if (x == 0 && z >= 17)
                     {
-                        arrayPosition = 15 + ((z - 17) * 16) + y * 256;
-                        density = chunk02densities[arrayPosition];
-                        material = chunk02materials[arrayPosition];
-                        light = chunk02lights[arrayPosition];
+                        index = 15 + ((z - 17) * 16) + y * 256;
+                        voxel = this.voxels02[index];
+                        light = this.lights02[index];
                     }
                     else if (x >= 1 && x <= 16 && z == 0)
                     {
-                        arrayPosition = 240 + (x - 1) + y * 256;
-                        density = chunk10densities[arrayPosition];
-                        material = chunk10materials[arrayPosition];
-                        light = chunk10lights[arrayPosition];
+                        index = 240 + (x - 1) + y * 256;
+                        voxel = this.voxels10[index];
+                        light = this.lights10[index];
                     }
                     else if (x >= 1 && x <= 16 && z >= 1 && z <= 16)
                     {
-                        arrayPosition = 0 + (x - 1) + ((z - 1) * 16) + y * 256;
-                        density = chunk11densities[arrayPosition];
-                        material = chunk11materials[arrayPosition];
-                        light = chunk11lights[arrayPosition];
+                        index = 0 + (x - 1) + ((z - 1) * 16) + y * 256;
+                        voxel = this.voxels11[index];
+                        light = this.lights11[index];
                     }
                     else if (x >= 1 && x <= 16 && z >= 17)
                     {
-                        arrayPosition = 0 + (x - 1) + ((z - 17) * 16) + y * 256;
-                        density = chunk12densities[arrayPosition];
-                        material = chunk12materials[arrayPosition];
-                        light = chunk12lights[arrayPosition];
+                        index = 0 + (x - 1) + ((z - 17) * 16) + y * 256;
+                        voxel = this.voxels12[index];
+                        light = this.lights12[index];
                     }
                     else if (x >= 17 && z == 0)
                     {
-                        arrayPosition = 240 + (x - 17) + y * 256;
-                        density = chunk20densities[arrayPosition];
-                        material = chunk20materials[arrayPosition];
-                        light = chunk20lights[arrayPosition];
+                        index = 240 + (x - 17) + y * 256;
+                        voxel = this.voxels20[index];
+                        light = this.lights20[index];
                     }
                     else if (x >= 17 && z >= 1 && z <= 16)
                     {
-                        arrayPosition = 0 + (x - 17) + ((z - 1) * 16) + y * 256;
-                        density = chunk21densities[arrayPosition];
-                        material = chunk21materials[arrayPosition];
-                        light = chunk21lights[arrayPosition];
+                        index = 0 + (x - 17) + ((z - 1) * 16) + y * 256;
+                        voxel = this.voxels21[index];
+                        light = this.lights21[index];
                     }
                     else if (x >= 17 && z >= 17)
                     {
-                        arrayPosition = 0 + (x - 17) + ((z - 17) * 16) + y * 256;
-                        density = chunk22densities[arrayPosition];
-                        material = chunk22materials[arrayPosition];
-                        light = chunk22lights[arrayPosition];
+                        index = 0 + (x - 17) + ((z - 17) * 16) + y * 256;
+                        voxel = this.voxels22[index];
+                        light = this.lights22[index];
                     }
 
-                    chunkDensities[index] = density;
-                    chunkMaterials[index] = material;
-                    chunkLights[index] = light;
+                    this.voxelsMerged[i] = voxel;
+                    this.lightsMerged[i] = light;
 
-                    index++;
+                    i++;
                 }
             }
         }
@@ -192,45 +169,83 @@ public struct MeshTerrainJob : IJob
             this.breakPoints.Add(new int2(this.vertices.Length, this.indices.Length));
         }
 
+        bool isEmpty = true;
+        bool isFull = true;
+
         for (int i = 0; i < 8; i++)
         {
             this.cornerPositions[i] = this.mcCornerPositions[i] + new float3(x, y, z);
             int index = (int)(this.cornerPositions[i].x + this.cornerPositions[i].z * 19.0f + this.cornerPositions[i].y * 361.0f);
-            this.cornerDensities[i] = chunkDensities[index];
+            this.cornerVoxels[i] = this.voxelsMerged[index];
+
+            if (this.cornerVoxels[i].GetMaterial() > 0)
+            {
+                isEmpty = false;
+            }
+            else
+            {
+                isFull = false;
+            }
         }
 
-        byte caseIndex = 0;
-        caseIndex |= (byte)((this.cornerDensities[0] >> 7) & 0x01);
-        caseIndex |= (byte)((this.cornerDensities[1] >> 6) & 0x02);
-        caseIndex |= (byte)((this.cornerDensities[2] >> 5) & 0x04);
-        caseIndex |= (byte)((this.cornerDensities[3] >> 4) & 0x08);
-        caseIndex |= (byte)((this.cornerDensities[4] >> 3) & 0x10);
-        caseIndex |= (byte)((this.cornerDensities[5] >> 2) & 0x20);
-        caseIndex |= (byte)((this.cornerDensities[6] >> 1) & 0x40);
-        caseIndex |= (byte)(this.cornerDensities[7] & 0x80);
-
-        if (caseIndex == 0x00 || caseIndex == 0xFF)
+        if (isEmpty || isFull)
+        {
             return;
+        }
 
         for (int i = 0; i < 8; i++)
         {
             int index = (int)(this.cornerPositions[i].x + this.cornerPositions[i].z * 19.0f + this.cornerPositions[i].y * 361.0f);
-            this.cornerMaterials[i] = this.chunkMaterials[index];
             this.cornerLights[i] = this.GetLight(index);
             this.cornerNormals[i] = this.GetNormal(index);
         }
 
-        float matId1 = (float)cornerMaterials[0];
-        float matId2 = (float)cornerMaterials[1];
-        float matId3 = (float)cornerMaterials[2];
-        float matId4 = (float)cornerMaterials[3];
-        float matId5 = (float)cornerMaterials[4];
-        float matId6 = (float)cornerMaterials[5];
-        float matId7 = (float)cornerMaterials[6];
-        float matId8 = (float)cornerMaterials[7];
+        float matId1 = (float)this.cornerVoxels[0].GetMaterial();
+        float matId2 = (float)this.cornerVoxels[1].GetMaterial();
+        float matId3 = (float)this.cornerVoxels[2].GetMaterial();
+        float matId4 = (float)this.cornerVoxels[3].GetMaterial();
+        float matId5 = (float)this.cornerVoxels[4].GetMaterial();
+        float matId6 = (float)this.cornerVoxels[5].GetMaterial();
+        float matId7 = (float)this.cornerVoxels[6].GetMaterial();
+        float matId8 = (float)this.cornerVoxels[7].GetMaterial();
 
         float4 matIds1234 = new float4(matId1, matId2, matId3, matId4);
         float4 matIds5678 = new float4(matId5, matId6, matId7, matId8);
+
+        byte caseIndex = 0;
+
+        if (matId1 > 0)
+        {
+            caseIndex |= 0b_0000_0001;
+        }
+        if (matId2 > 0)
+        {
+            caseIndex |= 0b_0000_0010;
+        }
+        if (matId3 > 0)
+        {
+            caseIndex |= 0b_0000_0100;
+        }
+        if (matId4 > 0)
+        {
+            caseIndex |= 0b_0000_1000;
+        }
+        if (matId5 > 0)
+        {
+            caseIndex |= 0b_0001_0000;
+        }
+        if (matId6 > 0)
+        {
+            caseIndex |= 0b_0010_0000;
+        }
+        if (matId7 > 0)
+        {
+            caseIndex |= 0b_0100_0000;
+        }
+        if (matId8 > 0)
+        {
+            caseIndex |= 0b_1000_0000;
+        }
 
         byte cellClass = mcCellClasses[caseIndex];
         int geometryCounts = mcCellGeometryCounts[cellClass];
@@ -265,92 +280,43 @@ public struct MeshTerrainJob : IJob
             float3 position1 = this.cornerPositions[index1];
             float3 normal0 = this.cornerNormals[index0];
             float3 normal1 = this.cornerNormals[index1];
-            byte material0 = this.cornerMaterials[index0];
-            byte material1 = this.cornerMaterials[index1];
-            sbyte density0 = this.cornerDensities[index0];
-            sbyte density1 = this.cornerDensities[index1];
+            Voxel voxel0 = this.cornerVoxels[index0];
+            Voxel voxel1 = this.cornerVoxels[index1];
+            bool solid0 = (this.cornerVoxels[index0].GetMaterial() > 0);
+            bool solid1 = (this.cornerVoxels[index1].GetMaterial() > 0);
             float sunLight0 = this.cornerLights[index0].x;
             float sunLight1 = this.cornerLights[index1].x;
             float sourceLight0 = this.cornerLights[index0].y;
             float sourceLight1 = this.cornerLights[index1].y;
 
-            /*
-            int t  = (density1 << 8) / (density1 - density0);
-            int u = 255 - t;
+            float weight0 = 0.0f;
+            float weight1 = 0.0f;
+            float materialId = 0.0f;
 
-            float weight0 = (float)t / 255.0f;
-            float weight1 = (float)u / 255.0f;
-            */
-
-            /*
-            float d0 = (float)density0;
-            float d1 = (float)density1;
-
-            if (d0 >= 0) d0++;
-            if (d1 >= 0) d1++;
-
-            float dist = math.abs(d0 - d1);
-            float distA = math.abs(d0);
-            float distB = math.abs(d1);
-
-            float weight1 = distA / dist;
-            float weight0 = distB / dist;
-            */
-
-            //if (weight0 >= 0.50f) { weight0 = 0.50f; weight1 = 0.50f; }
-            //if (weight1 >= 0.50f) { weight1 = 0.50f; weight0 = 0.50f; }
-
-            /*
-            if ((position0.x == position1.x) && (position0.z == position1.z))
+            if (solid0)
             {
-                if (position0.y > position1.y && density0 < density1)
-                {
-                    if (density0 > density1)
-                    {
-                        weight0 = 0.0f;
-                        weight1 = 1.0f;
-                    }
-                }
+                materialId = voxel0.GetMaterial();
 
-                if (position0.y < position1.y && density1 < density0)
-                {
-                    if (density0 > density1)
-                    {
-                        weight0 = 0.0f;
-                        weight1 = 1.0f;
-                    }
-                }
-            }
-            else
-            {
-                if (position0.y == position1.y)
-                {
-                    if (density0 < density1)
-                    {
-                        weight0 = 0.0f;
-                        weight1 = 1.0f;
-                    }
+                if (position0.x < position1.x) weight1 = voxel0.GetRight();
+                else if (position0.x > position1.x) weight1 = voxel0.GetLeft();
+                else if (position0.y < position1.y) weight1 = voxel0.GetTop();
+                else if (position0.y > position1.y) weight1 = voxel0.GetBottom();
+                else if (position0.z < position1.z) weight1 = voxel0.GetFront();
+                else if (position0.z > position1.z) weight1 = voxel0.GetBack();
 
-                    if (density1 < density0)
-                    {
-                        weight0 = 1.0f;
-                        weight1 = 0.0f;
-                    }
-                }
-            }
-            */
-
-            float weight0;
-            float weight1;
-
-            if (density0 < density1)
-            {
-                weight1 = math.abs((float)density0 + 1.0f) / 127.0f;
                 weight0 = 1.0f - weight1;
             }
             else
             {
-                weight0 = math.abs((float)density1 + 1.0f) / 127.0f;
+                materialId = voxel1.GetMaterial();
+
+                if (position0.x < position1.x) weight0 = voxel1.GetLeft();
+                else if (position0.x > position1.x) weight0 = voxel1.GetRight();
+                else if (position0.y < position1.y) weight0 = voxel1.GetBottom();
+                else if (position0.y > position1.y) weight0 = voxel1.GetTop();
+                else if (position0.z < position1.z) weight0 = voxel1.GetBack();
+                else if (position0.z > position1.z) weight0 = voxel1.GetFront();
+
                 weight1 = 1.0f - weight0;
             }
 
@@ -360,35 +326,17 @@ public struct MeshTerrainJob : IJob
 
             float sunLight = 0.0f;
 
-            if (sunLight0 == 0.0f && sunLight1 > 0.0f)
+            if (solid0)
             {
                 sunLight = sunLight1 - weight0;
             }
-            
-            if (sunLight1 == 0.0f && sunLight0 > 0.0f)
+            else
             {
                 sunLight = sunLight0 - weight1;
             }
 
-            /*
-            Debug.Log("sunLight0: " + sunLight0);
-            Debug.Log("sunLight1: " + sunLight1);
-            Debug.Log("sunLight: " + sunLight);
-            */
-
-            float sourceLight = weight0 * sourceLight0 + weight1 * sourceLight1;
-
-            float materialId;
-            if (density0 < density1)
-            {
-                materialId = (float)material0;
-                if (material1 != 255)
-                    materialId = (float)material1;
-            }
-            else
-            {
-                materialId = (float)material1;
-            }
+            // TODO
+            float sourceLight = 0.0f;
 
             this.lights.Add(new float2(sunLight / 15.0f, sourceLight / 15.0f));
             this.vertices.Add(vertex - new float3(1.0f, 0.0f, 1.0f));
@@ -425,82 +373,10 @@ public struct MeshTerrainJob : IJob
     private float2 GetLight(int index)
     {
         float sunLight = 0.0f;
-
-        sunLight = (float)((this.chunkLights[index] >> 4) & 0xF);
-
-        /*
-        sunLight = math.max(sunLight, (int)((chunkLights[index - 381] >> 4) & 0xF));
-        sunLight = math.max(sunLight, (int)((chunkLights[index - 362] >> 4) & 0xF));
-        sunLight = math.max(sunLight, (int)((chunkLights[index - 343] >> 4) & 0xF));
-        sunLight = math.max(sunLight, (int)((chunkLights[index - 20] >> 4) & 0xF));
-        sunLight = math.max(sunLight, (int)((chunkLights[index - 1] >> 4) & 0xF));
-        sunLight = math.max(sunLight, (int)((chunkLights[index + 18] >> 4) & 0xF));
-        sunLight = math.max(sunLight, (int)((chunkLights[index + 341] >> 4) & 0xF));
-        sunLight = math.max(sunLight, (int)((chunkLights[index + 360] >> 4) & 0xF));
-        sunLight = math.max(sunLight, (int)((chunkLights[index + 379] >> 4) & 0xF));
-        sunLight = math.max(sunLight, (int)((chunkLights[index - 380] >> 4) & 0xF));
-        sunLight = math.max(sunLight, (int)((chunkLights[index - 361] >> 4) & 0xF));
-        sunLight = math.max(sunLight, (int)((chunkLights[index - 342] >> 4) & 0xF));
-        sunLight = math.max(sunLight, (int)((chunkLights[index - 19] >> 4) & 0xF));
-        sunLight = math.max(sunLight, (int)((chunkLights[index] >> 4) & 0xF));
-        sunLight = math.max(sunLight, (int)((chunkLights[index + 19] >> 4) & 0xF));
-        sunLight = math.max(sunLight, (int)((chunkLights[index + 342] >> 4) & 0xF));
-        sunLight = math.max(sunLight, (int)((chunkLights[index + 361] >> 4) & 0xF));
-        sunLight = math.max(sunLight, (int)((chunkLights[index + 380] >> 4) & 0xF));
-        sunLight = math.max(sunLight, (int)((chunkLights[index - 379] >> 4) & 0xF));
-        sunLight = math.max(sunLight, (int)((chunkLights[index - 360] >> 4) & 0xF));
-        sunLight = math.max(sunLight, (int)((chunkLights[index - 341] >> 4) & 0xF));
-        sunLight = math.max(sunLight, (int)((chunkLights[index - 18] >> 4) & 0xF));
-        sunLight = math.max(sunLight, (int)((chunkLights[index + 1] >> 4) & 0xF));
-        sunLight = math.max(sunLight, (int)((chunkLights[index + 20] >> 4) & 0xF));
-        sunLight = math.max(sunLight, (int)((chunkLights[index + 343] >> 4) & 0xF));
-        sunLight = math.max(sunLight, (int)((chunkLights[index + 362] >> 4) & 0xF));
-        sunLight = math.max(sunLight, (int)((chunkLights[index + 381] >> 4) & 0xF));
-        */
-
-
-        /*
-        sunLight = math.max(sunLight, (int)((chunkLights[index + 1] >> 4) & 0xF));
-        sunLight = math.max(sunLight, (int)((chunkLights[index - 1] >> 4) & 0xF));
-        sunLight = math.max(sunLight, (int)((chunkLights[index + 19] >> 4) & 0xF));
-        sunLight = math.max(sunLight, (int)((chunkLights[index - 19] >> 4) & 0xF));
-        sunLight = math.max(sunLight, (int)((chunkLights[index + 361] >> 4) & 0xF));
-        sunLight = math.max(sunLight, (int)((chunkLights[index - 361] >> 4) & 0xF));
-        */
+        sunLight = (float)((this.lightsMerged[index] >> 4) & 0xF);
 
         float sourceLight = 0.0f;
-
-        sourceLight = (float)(chunkLights[index] & 0xF);
-
-        /*
-        sourceLight = math.max(sourceLight, (int)(chunkLights[index - 381] & 0xF));
-        sourceLight = math.max(sourceLight, (int)(chunkLights[index - 362] & 0xF));
-        sourceLight = math.max(sourceLight, (int)(chunkLights[index - 343] & 0xF));
-        sourceLight = math.max(sourceLight, (int)(chunkLights[index - 20] & 0xF));
-        sourceLight = math.max(sourceLight, (int)(chunkLights[index - 1] & 0xF));
-        sourceLight = math.max(sourceLight, (int)(chunkLights[index + 18] & 0xF));
-        sourceLight = math.max(sourceLight, (int)(chunkLights[index + 341] & 0xF));
-        sourceLight = math.max(sourceLight, (int)(chunkLights[index + 360] & 0xF));
-        sourceLight = math.max(sourceLight, (int)(chunkLights[index + 379] & 0xF));
-        sourceLight = math.max(sourceLight, (int)(chunkLights[index - 380] & 0xF));
-        sourceLight = math.max(sourceLight, (int)(chunkLights[index - 361] & 0xF));
-        sourceLight = math.max(sourceLight, (int)(chunkLights[index - 342] & 0xF));
-        sourceLight = math.max(sourceLight, (int)(chunkLights[index - 19] & 0xF));
-        sourceLight = math.max(sourceLight, (int)(chunkLights[index] & 0xF));
-        sourceLight = math.max(sourceLight, (int)(chunkLights[index + 19] & 0xF));
-        sourceLight = math.max(sourceLight, (int)(chunkLights[index + 342] & 0xF));
-        sourceLight = math.max(sourceLight, (int)(chunkLights[index + 361] & 0xF));
-        sourceLight = math.max(sourceLight, (int)(chunkLights[index + 380] & 0xF));
-        sourceLight = math.max(sourceLight, (int)(chunkLights[index - 379] & 0xF));
-        sourceLight = math.max(sourceLight, (int)(chunkLights[index - 360] & 0xF));
-        sourceLight = math.max(sourceLight, (int)(chunkLights[index - 341] & 0xF));
-        sourceLight = math.max(sourceLight, (int)(chunkLights[index - 18] & 0xF));
-        sourceLight = math.max(sourceLight, (int)(chunkLights[index + 1] & 0xF));
-        sourceLight = math.max(sourceLight, (int)(chunkLights[index + 20] & 0xF));
-        sourceLight = math.max(sourceLight, (int)(chunkLights[index + 343] & 0xF));
-        sourceLight = math.max(sourceLight, (int)(chunkLights[index + 362] & 0xF));
-        sourceLight = math.max(sourceLight, (int)(chunkLights[index + 381] & 0xF));
-        */
+        sourceLight = (float)(this.lightsMerged[index] & 0xF);
 
         return new float2(sunLight, sourceLight);
     }
@@ -521,52 +397,13 @@ public struct MeshTerrainJob : IJob
                     int arrayPosition = x + y * 361 + z * 19;
                     arrayPosition = index + arrayPosition;
 
-                    float3 offset = new float3(x, y, z);
-                    float weight = chunkDensities[arrayPosition];
-
-                    if (weight >= 0.0f)
+                    if (this.voxelsMerged[arrayPosition].GetMaterial() > 0)
                     {
-                        weight = 1.0f;
+                        normal -= new float3(x, y, z);
                     }
-                    else
-                    {
-                        weight = -1.0f;
-                    }
-
-                    normal += offset * weight;
                 }
             }
         }
-
-
-        /*
-        normal += new float3(-1.0f, -1.0f, -1.0f) * (float)chunkDensities[index - 381];
-        normal += new float3(-1.0f, -1.0f, 0.0f) * (float)chunkDensities[index - 362];
-        normal += new float3(-1.0f, -1.0f, 1.0f) * (float)chunkDensities[index - 343];
-        normal += new float3(-1.0f, 0.0f, -1.0f) * (float)chunkDensities[index - 20];
-        normal += new float3(-1.0f, 0.0f, 0.0f) * (float)chunkDensities[index - 1];
-        normal += new float3(-1.0f, 0.0f, 1.0f) * (float)chunkDensities[index + 18];
-        normal += new float3(-1.0f, 1.0f, -1.0f) * (float)chunkDensities[index + 341];
-        normal += new float3(-1.0f, 1.0f, 0.0f) * (float)chunkDensities[index + 360];
-        normal += new float3(-1.0f, 1.0f, 1.0f) * (float)chunkDensities[index + 379];
-        normal += new float3(0.0f, -1.0f, -1.0f) * (float)chunkDensities[index - 380];
-        normal += new float3(0.0f, -1.0f, 0.0f) * (float)chunkDensities[index - 361];
-        normal += new float3(0.0f, -1.0f, 1.0f) * (float)chunkDensities[index - 342];
-        normal += new float3(0.0f, 0.0f, -1.0f) * (float)chunkDensities[index - 19];
-        normal += new float3(0.0f, 0.0f, 1.0f) * (float)chunkDensities[index + 19];
-        normal += new float3(0.0f, 1.0f, -1.0f) * (float)chunkDensities[index + 342];
-        normal += new float3(0.0f, 1.0f, 0.0f) * (float)chunkDensities[index + 361];
-        normal += new float3(0.0f, 1.0f, 1.0f) * (float)chunkDensities[index + 380];
-        normal += new float3(1.0f, -1.0f, -1.0f) * (float)chunkDensities[index - 379];
-        normal += new float3(1.0f, -1.0f, 0.0f) * (float)chunkDensities[index - 360];
-        normal += new float3(1.0f, -1.0f, 1.0f) * (float)chunkDensities[index - 341];
-        normal += new float3(1.0f, 0.0f, -1.0f) * (float)chunkDensities[index - 18];
-        normal += new float3(1.0f, 0.0f, 0.0f) * (float)chunkDensities[index + 1];
-        normal += new float3(1.0f, 0.0f, 1.0f) * (float)chunkDensities[index + 20];
-        normal += new float3(1.0f, 1.0f, -1.0f) * (float)chunkDensities[index + 343];
-        normal += new float3(1.0f, 1.0f, 0.0f) * (float)chunkDensities[index + 362];
-        normal += new float3(1.0f, 1.0f, 1.0f) * (float)chunkDensities[index + 381];
-        */
 
         if (!(normal.x == 0.0f && normal.y == 0.0f && normal.z == 0.0f))
         {

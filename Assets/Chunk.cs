@@ -5,87 +5,59 @@ using Unity.Collections;
 
 public class Chunk
 {
-    private sbyte[] densities;
+    private Voxel[] voxels;
     private byte[] lights;
-    private byte[] materials;
 
-    public bool areDensitiesDone = false;
-    public bool areMaterialsDone = false;
-    public bool areLightsDone = false;
-    public bool areMeshesDone = false;
+    public bool hasVoxels = false;
+    public bool hasLights = false;
+    public bool hasObjects = false;
 
     public Chunk()
     {
-        this.densities = new sbyte[65536];
-        this.materials = new byte[65536];
+        this.voxels = new Voxel[65536];
         this.lights = new byte[65536];
     }
 
     //
-    // Densities
+    // Set Voxels
     //
 
-    public sbyte[] GetDensities()
+    public void SetVoxels(Voxel[] voxels)
     {
-        return this.densities;
+        this.voxels = voxels;
     }
 
-    public void SetDensities(sbyte[] densities)
+    public void SetVoxelsFromNative(NativeArray<Voxel> voxels)
     {
-        this.densities = densities;
+        voxels.CopyTo(this.voxels);
     }
 
-    public void SetDensitiesFromNative(NativeArray<sbyte> densities)
+    public void SetVoxel(int index, Voxel voxel)
     {
-        densities.CopyTo(this.densities);
-    }
-
-    public sbyte GetDensity(int arrayPosition)
-    {
-        return this.densities[arrayPosition];
-    }
-
-    public void SetDensity(int arrayPosition, sbyte density)
-    {
-        this.densities[arrayPosition] = density;
+        this.voxels[index] = voxel;
     }
 
     //
-    // Materials
+    // Get Voxels
     //
 
-    public byte[] GetMaterials()
+    public Voxel[] GetVoxels()
     {
-        return this.materials;
+        return this.voxels;
     }
 
-    public void SetMaterials(byte[] materials)
+    public Voxel GetVoxel(int index)
     {
-        this.materials = materials;
-    }
-
-    public void SetMaterialsFromNative(NativeArray<byte> materials)
-    {
-        materials.CopyTo(this.materials);
-    }
-
-    public byte GetMaterial(int arrayPosition)
-    {
-        return this.materials[arrayPosition];
-    }
-
-    public void SetMaterial(int arrayPosition, byte material)
-    {
-        this.materials[arrayPosition] = material;
+        return this.voxels[index];
     }
 
     //
-    // Lights
+    // Set Lights
     //
 
-    public byte[] GetLights()
+    public void SetLights(byte[] lights)
     {
-        return this.lights;
+        this.lights = lights;
     }
 
     public void SetLightsFromNative(NativeArray<byte> lights)
@@ -93,75 +65,58 @@ public class Chunk
         lights.CopyTo(this.lights);
     }
 
-    //
-    // Sun Lights
-    //
-
-    public byte[] GetSunLights()
+    public void SetLight(int index, byte light)
     {
-        byte[] sunLights = new byte[65536];
-        for (int i = 0; i < 65536; i++)
-        {
-            sunLights[i] = this.GetSunLight(i);
-        }
-        return sunLights;
-    }
-
-    public void SetSunLights(byte[] sunLights)
-    {
-        for (int i = 0; i < 65536; i++)
-        {
-            this.SetSunLight(i, sunLights[i]);
-        }
-    }
-
-    public void SetSunLightsFromNative(NativeArray<byte> sunLights)
-    {
-        for (int i = 0; i < 65536; i++)
-        {
-            this.SetSunLight(i, sunLights[i]);
-        }
-    }
-
-    public byte GetSunLight(int arrayPosition)
-    {
-        return (byte)((lights[arrayPosition] >> 4) & 0xF);
-    }
-
-    public void SetSunLight(int arrayPosition, byte lightValue)
-    {
-        lights[arrayPosition] = (byte)((lights[arrayPosition] & 0xF) | (lightValue << 4));
+        this.lights[index] = light;
     }
 
     //
-    // Source Lights
+    // Get Lights
     //
 
-    public byte[] GetSourceLights()
+    public byte[] GetLights()
     {
-        byte[] sourceLights = new byte[65536];
-        for (int i = 0; i < 65536; i++)
-        {
-            sourceLights[i] = this.GetSourceLight(i);
-        }
-        return sourceLights;
+        return this.lights;
     }
 
-    public void SetSourceLights(byte[] sourceLights)
+    public byte GetLight(int index)
     {
-        for (int i = 0; i < 65536; i++)
-        {
-            this.SetSourceLight(i, sourceLights[i]);
-        }
+        return this.lights[index];
     }
 
-    public byte GetSourceLight(int arrayPosition)
+    //
+    // Set Sun Lights
+    //
+
+    public void SetSunLight(int index, byte sunLight)
     {
-        return (byte)(lights[arrayPosition] & 0xF);
+        this.lights[index] = (byte)((this.lights[index] & 0b_0000_1111) | ((sunLight & 0b_0000_1111) << 4));
     }
 
-    public void SetSourceLight(int arrayPosition, byte lightValue)
+    //
+    // Get Sun Lights
+    //
+
+    public byte GetSunLight(int index)
     {
-        lights[arrayPosition] = (byte)((lights[arrayPosition] & 0xF) | lightValue);
+        return (byte)(this.lights[index] >> 4);
+    }
+
+    //
+    // Set Source Lights
+    //
+
+    public void SetSourceLight(int index, byte sourceLight)
+    {
+        this.lights[index] = (byte)((this.lights[index] & 0b_1111_0000) | (sourceLight & 0b_0000_1111));
+    }
+
+    //
+    // Get Source Lights
+    //
+
+    public byte GetSourceLight(int index)
+    {
+        return (byte)(this.lights[index] & 0b_0000_1111);
     }
 }

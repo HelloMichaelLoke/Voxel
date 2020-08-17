@@ -16,6 +16,7 @@ public class WorldEditController : MonoBehaviour
 
     void Update()
     {
+        /*
         RaycastHit hit;
         Ray ray = this.mainCamera.ScreenPointToRay(Input.mousePosition);
         int layerMask = 1 << 8;
@@ -50,5 +51,6 @@ public class WorldEditController : MonoBehaviour
             this.visualizer.SetActive(false);
             this.visualizerClosest.SetActive(false);
         }
+        */
     }
 }

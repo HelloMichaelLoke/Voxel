@@ -10,22 +10,19 @@ using Unity.Mathematics;
 public struct GenerateTerrainJob : IJob
 {
     public NativeArray<float> heights;
-    public NativeArray<sbyte> densities;
-    public NativeArray<byte> materials;
+    public NativeArray<Voxel> voxels;
 
-    public int2 chunkCoordinate;
-    public int3 chunkSize;
+    public int2 chunkPosition;
 
     public void Execute()
     {
-        int3 startPosition;
-        startPosition.x = chunkCoordinate.x * chunkSize.x;
-        startPosition.y = 0;
-        startPosition.z = chunkCoordinate.y * chunkSize.z;
+        int3 startPosition = new int3(chunkPosition.x * 16, 0, chunkPosition.y * 16);
+        int3 endPosition = new int3(startPosition.x + 15, 255, startPosition.z + 15);
 
-        int3 endPosition = startPosition + chunkSize - new int3(1);
-
+        //
         // Generate Heights
+        //
+
         int i = 0;
         for (int z = startPosition.z; z <= endPosition.z; z++)
         {
@@ -36,125 +33,94 @@ public struct GenerateTerrainJob : IJob
             }
         }
 
-        // Fill densities based on heights & determine materials
+        //
+        // Generate Voxels
+        //
+
         i = 0;
-        int xLocal, zLocal;
-        sbyte density;
-        byte material;
+        int heightIndex = 0;
         for (int y = startPosition.y; y <= endPosition.y; y++)
         {
-            zLocal = 0;
+            heightIndex = 0;
+
             for (int z = startPosition.z; z <= endPosition.z; z++)
             {
-                xLocal = 0;
                 for (int x = startPosition.x; x <= endPosition.x; x++)
                 {
-                    /*
-                    float height = heights[xLocal + zLocal * chunkSize.x];
+                    Voxel voxel = new Voxel();
+                    float height = heights[heightIndex];
 
-                    density = 127;
-                    if ((float)y < math.floor(height))
+                    if (y <= height)
                     {
-                        density = -128;
-                    }
-                    else if ((float)y == math.floor(height))
-                    {
-                        float offset = height - math.floor(height);
-                        float value = math.round(offset * 127.0f);
-                        value = -1.0f - value;
-                        density = (sbyte)value;
-                    }
-                    else if ((float)y == math.ceil(height))
-                    {
-                        float offset = height - math.floor(height);
-                        float value = math.round(offset * 127.0f);
-                        value = 127.0f - value;
-                        density = (sbyte)value;
-                    }
-                    else if ((float)y > math.ceil(height))
-                    {
-                        density = 127;
-                    }
+                        float caveNoiseCenter = this.GetCaves(new float3(x, y, z));
 
-                    if ((float)y < math.floor(height - 2.0f))
-                    {
-                        float caveNoise = GetCaves(new float3(x, y, z));
-
-                        if (caveNoise < 0.0f)
+                        if (caveNoiseCenter < 0.0f)
                         {
-                            density = (sbyte)-math.round(127.0f * -caveNoise);
-                            density -= 1;
-                        }
-                        else
-                        {
-                            density = (sbyte)math.round(127.0f * caveNoise);
-                        }
-                    }
+                            float caveNoiseRight = this.GetCaves(new float3(x + 1, y, z));
+                            float caveNoiseLeft = this.GetCaves(new float3(x - 1, y, z));
+                            float caveNoiseTop = this.GetCaves(new float3(x, y + 1, z));
+                            float caveNoiseBottom = this.GetCaves(new float3(x, y - 1, z));
+                            float caveNoiseFront = this.GetCaves(new float3(x, y, z + 1));
+                            float caveNoiseBack = this.GetCaves(new float3(x, y, z - 1));
 
-                    if (density >= 0)
-                        material = 255;
-                    else
-                        material = (byte)((noise.snoise(new float3(x, y, z) * 0.01f) + 1.0f) / 2.0f * 3.0f);
+                            voxel.SetVoxel(255, 255, 255, 255, 255, 255, this.GetMaterial(new float3(x, y, z)));
 
-                    if (xLocal == 8 && zLocal == 8)
-                    {
-                        density = 127;
-                        material = 255;
-                    }
-                    */
-
-                    if (y >= 70)
-                    {
-                        density = 127;
-                        material = 255;
-                    }
-                    else
-                    {
-                        float caveNoise = GetCaves(new float3(x, y, z));
-
-                        if (caveNoise < 0.0f)
-                        {
-                            float caveNoiseAbove = GetCaves(new float3(x, y + 1.0f, z));
-
-                            if (caveNoiseAbove >= 0.0f)
+                            if (y + 1 >= height)
                             {
-                                density = (sbyte)math.round(127.0f * caveNoise);
-                                density -= 1;
+                                float distance = math.abs(y - height);
+                                voxel.SetLeft(distance);
+                                voxel.SetRight(distance);
+                                voxel.SetTop(distance);
+                                voxel.SetBottom(distance);
+                                voxel.SetFront(distance);
+                                voxel.SetBack(distance);
                             }
                             else
                             {
-                                density = -128;
+                                if (caveNoiseRight >= 0.0f)
+                                {
+                                    float distance = math.abs(caveNoiseCenter - caveNoiseRight);
+                                    voxel.SetRight((-caveNoiseCenter) / distance);
+                                }
+                                if (caveNoiseLeft >= 0.0f)
+                                {
+                                    float distance = math.abs(caveNoiseCenter - caveNoiseLeft);
+                                    voxel.SetLeft((-caveNoiseCenter) / distance);
+                                }
+                                if (caveNoiseTop >= 0.0f)
+                                {
+                                    float distance = math.abs(caveNoiseCenter - caveNoiseTop);
+                                    voxel.SetTop((-caveNoiseCenter) / distance);
+                                }
+                                if (caveNoiseBottom >= 0.0f)
+                                {
+                                    float distance = math.abs(caveNoiseCenter - caveNoiseBottom);
+                                    voxel.SetBottom((-caveNoiseCenter) / distance);
+                                }
+                                if (caveNoiseFront >= 0.0f)
+                                {
+                                    float distance = math.abs(caveNoiseCenter - caveNoiseFront);
+                                    voxel.SetFront((-caveNoiseCenter) / distance);
+                                }
+                                if (caveNoiseBack >= 0.0f)
+                                {
+                                    float distance = math.abs(caveNoiseCenter - caveNoiseBack);
+                                    voxel.SetBack((-caveNoiseCenter) / distance);
+                                }
                             }
-                            
-                            material = (byte)math.round((noise.snoise(new float3(x, y, z) * 0.1f) + 1.0f) / 2.0f * 3.0f);
-                        }
-                        else
-                        {
-                            density = 127;
-
-                            material = 255;
                         }
                     }
 
-                    if (y <= 1)
+                    if (y <= 2)
                     {
-                        density = -128;
-                        material = 0;
+                        voxel.SetVoxel(255, 255, 255, 255, 255, 255, 1);
                     }
 
-                    if (y >= 254)
-                    {
-                        density = 127;
-                        material = 255;
-                    }
-
-                    densities[i] = density;
-                    materials[i] = material;
+                    this.voxels[i] = voxel;
 
                     i++;
-                    xLocal++;
+                    heightIndex++;
                 }
-                zLocal++;
             }
         }
     }
@@ -162,10 +128,10 @@ public struct GenerateTerrainJob : IJob
     private float GetHeight(float2 position)
     {
         // Settings
-        float maxHeight = 200.0f;
+        float maxHeight = 70.0f;
 
         // Noises
-        float noiseAFreq = 0.001f;
+        float noiseAFreq = 0.01f;
         float noiseA = noise.snoise(new float2(1000.0f, 1000.0f) + position * noiseAFreq);
 
         // Noise to height value
@@ -173,6 +139,17 @@ public struct GenerateTerrainJob : IJob
         height += 1.0f;
         height *= maxHeight / 2.0f;
         return height;
+    }
+
+    private byte GetMaterial(float3 position)
+    {
+        float material = noise.snoise(new float3(position.x, position.y, position.z + 10000.0f) * 0.1f);
+        material += 1.0f; // Set range to (0, 2)
+        material /= 2.0f; // Set range to (0, 1)
+        material *= 3.0f; // Set range to (0, 3)
+        material += 1.0f; // Set range to (1, 4) so it can't be 0
+
+        return (byte)material;
     }
 
     private float GetCaves(float3 position)

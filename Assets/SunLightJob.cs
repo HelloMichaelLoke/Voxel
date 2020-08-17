@@ -9,27 +9,171 @@ using Unity.Mathematics;
 [BurstCompile(CompileSynchronously = true)]
 public struct SunLightJob : IJob
 {
-    public NativeArray<byte> sunLights;
+    // Final light data output
+    public NativeArray<byte> lights;
 
-    public NativeArray<sbyte> densities;
-    public NativeArray<int> lights;
+    // Temporary data (48 * 48 * 256)
+    public NativeArray<bool> isSolid;
+    public NativeArray<byte> sunLights;
     public NativeQueue<int3> lightQueue;
 
-    public NativeArray<sbyte> chunk00densities;
-    public NativeArray<sbyte> chunk10densities;
-    public NativeArray<sbyte> chunk20densities;
-    public NativeArray<sbyte> chunk01densities;
-    public NativeArray<sbyte> chunk11densities;
-    public NativeArray<sbyte> chunk21densities;
-    public NativeArray<sbyte> chunk02densities;
-    public NativeArray<sbyte> chunk12densities;
-    public NativeArray<sbyte> chunk22densities;
+    // Used data
+    public NativeArray<Voxel> voxels00;
+    public NativeArray<Voxel> voxels10;
+    public NativeArray<Voxel> voxels20;
+    public NativeArray<Voxel> voxels01;
+    public NativeArray<Voxel> voxels11;
+    public NativeArray<Voxel> voxels21;
+    public NativeArray<Voxel> voxels02;
+    public NativeArray<Voxel> voxels12;
+    public NativeArray<Voxel> voxels22;
 
+    // Information
     public int2 chunkPosition;
 
     public void Execute()
     {
-        int index = 0;
+        this.MergeChunks();
+        this.SpreadSunLights();
+        this.UpdateChunk();
+    }
+
+    public void SpreadSunLights()
+    {
+        while (this.lightQueue.Count > 0)
+        {
+            this.SpreadSunLight(this.lightQueue.Dequeue());
+        }
+    }
+
+    public void SpreadSunLight(int3 position)
+    {
+        int index = position.x + position.z * 48 + position.y * 2304;
+        int lightValue = this.sunLights[index];
+
+        // -X Voxel (Left)
+        if (position.x > 0)
+        {
+            int indexLeft = index - 1;
+            if (!this.isSolid[indexLeft])
+            {
+                int lightValueLeft = this.sunLights[indexLeft];
+
+                if (lightValue - lightValueLeft > 1)
+                {
+                    lightValueLeft = lightValue - 1;
+                    this.sunLights[indexLeft] = (byte)lightValueLeft;
+
+                    if (lightValueLeft > 1) this.lightQueue.Enqueue(position + new int3(-1, 0, 0));
+                }
+            }
+        }
+
+        // +X Voxel (Right)
+        if (position.x < 48 - 1)
+        {
+            int indexRight = index + 1;
+            if (!this.isSolid[indexRight])
+            {
+                int lightValueRight = this.sunLights[indexRight];
+
+                if (lightValue - lightValueRight > 1)
+                {
+                    lightValueRight = lightValue - 1;
+                    this.sunLights[indexRight] = (byte)lightValueRight;
+
+                    if (lightValueRight > 1)
+                        this.lightQueue.Enqueue(position + new int3(1, 0, 0));
+                }
+            }
+        }
+
+        // -Z Voxel (Front)
+        if (position.z > 0)
+        {
+            int indexFront = index - 48;
+            if (!this.isSolid[indexFront])
+            {
+                int lightValueFront = this.sunLights[indexFront];
+
+                if (lightValue - lightValueFront > 1)
+                {
+                    lightValueFront = lightValue - 1;
+                    this.sunLights[indexFront] = (byte)lightValueFront;
+
+                    if (lightValueFront > 1)
+                        this.lightQueue.Enqueue(position + new int3(0, 0, -1));
+                }
+            }
+        }
+
+        // +Z Voxel (Back)
+        if (position.z < 48 - 1)
+        {
+            int indexBack = index + 48;
+            if (!this.isSolid[indexBack])
+            {
+                int lightValueBack = this.sunLights[indexBack];
+
+                if (lightValue - lightValueBack > 1)
+                {
+                    lightValueBack = lightValue - 1;
+                    this.sunLights[indexBack] = (byte)lightValueBack;
+
+                    if (lightValueBack > 1)
+                        this.lightQueue.Enqueue(position + new int3(0, 0, 1));
+                }
+            }
+        }
+
+        // -Y Voxel (Bottom)
+        if (position.y > 0)
+        {
+            int indexBottom = index - 2304;
+            if (!this.isSolid[indexBottom])
+            {
+                int lightValueBottom = this.sunLights[indexBottom];
+
+                if (lightValue == 15)
+                {
+                    this.sunLights[indexBottom] = 15;
+                    this.lightQueue.Enqueue(position + new int3(0, -1, 0));
+                }
+                else if (lightValue - lightValueBottom > 1)
+                {
+                    lightValueBottom = lightValue - 1;
+                    this.sunLights[indexBottom] = (byte)lightValueBottom;
+
+                    if (lightValueBottom > 1)
+                        this.lightQueue.Enqueue(position + new int3(0, -1, 0));
+                }
+            }
+        }
+
+        // +Y Voxel (Top)
+        if (position.y < 256 - 1)
+        {
+            int indexTop = index + 2304;
+            if (!this.isSolid[indexTop])
+            {
+                int lightValueTop = this.sunLights[indexTop];
+                if (lightValue - lightValueTop > 1)
+                {
+                    lightValueTop = lightValue - 1;
+                    this.sunLights[indexTop] = (byte)lightValueTop;
+
+                    if (lightValueTop > 1)
+                        this.lightQueue.Enqueue(position + new int3(0, 1, 0));
+                }
+            }
+        }
+    }
+
+    public void MergeChunks()
+    {
+        int i = 0;
+        bool isSolid;
+        int index;
 
         for (int y = 0; y <= 255; y++)
         {
@@ -37,199 +181,75 @@ public struct SunLightJob : IJob
             {
                 for (int x = 0; x <= 47; x++)
                 {
-                    sbyte density = 0;
-                    int arrayPosition = 0;
+                    isSolid = false;
 
                     if (x <= 15 && z <= 15)
                     {
-                        arrayPosition = x + (z * 16) + y * 256;
-                        density = chunk00densities[arrayPosition];
+                        index = x + (z * 16) + y * 256;
+                        if (voxels00[index].GetMaterial() > 0) isSolid = true;
                     }
                     else if (x >= 16 && x <= 31 && z <= 15)
                     {
-                        arrayPosition = (x - 16) + (z * 16) + y * 256;
-                        density = chunk10densities[arrayPosition];
+                        index = (x - 16) + (z * 16) + y * 256;
+                        if (voxels10[index].GetMaterial() > 0) isSolid = true;
                     }
                     else if (x >= 32 && z <= 15)
                     {
-                        arrayPosition = (x - 32) + (z * 16) + y * 256;
-                        density = chunk20densities[arrayPosition];
+                        index = (x - 32) + (z * 16) + y * 256;
+                        if (voxels20[index].GetMaterial() > 0) isSolid = true;
                     }
                     else if (x <= 15 && z >= 16 && z <= 31)
                     {
-                        arrayPosition = x + ((z - 16) * 16) + y * 256;
-                        density = chunk01densities[arrayPosition];
+                        index = x + ((z - 16) * 16) + y * 256;
+                        if (voxels01[index].GetMaterial() > 0) isSolid = true;
                     }
                     else if (x >= 16 && x <= 31 && z >= 16 && z <= 31)
                     {
-                        arrayPosition = x - 16 + ((z - 16) * 16) + y * 256;
-                        density = chunk11densities[arrayPosition];
+                        index = x - 16 + ((z - 16) * 16) + y * 256;
+                        if (voxels11[index].GetMaterial() > 0) isSolid = true;
                     }
-                    else if(x >= 32 && z >= 16 && z <= 31)
+                    else if (x >= 32 && z >= 16 && z <= 31)
                     {
-                        arrayPosition = (x - 32) + ((z - 16) * 16) + y * 256;
-                        density = chunk21densities[arrayPosition];
+                        index = (x - 32) + ((z - 16) * 16) + y * 256;
+                        if (voxels21[index].GetMaterial() > 0) isSolid = true;
                     }
                     else if (x <= 15 && z >= 32)
                     {
-                        arrayPosition = x + ((z - 32) * 16) + y * 256;
-                        density = chunk02densities[arrayPosition];
+                        index = x + ((z - 32) * 16) + y * 256;
+                        if (voxels02[index].GetMaterial() > 0) isSolid = true;
                     }
                     else if (x >= 16 && x <= 31 && z >= 32)
                     {
-                        arrayPosition = (x - 16) + ((z - 32) * 16) + y * 256;
-                        density = chunk12densities[arrayPosition];
+                        index = (x - 16) + ((z - 32) * 16) + y * 256;
+                        if (voxels12[index].GetMaterial() > 0) isSolid = true;
                     }
                     else if (x >= 32 && z >= 32)
                     {
-                        arrayPosition = (x - 32) + ((z - 32) * 16) + y * 256;
-                        density = chunk22densities[arrayPosition];
+                        index = (x - 32) + ((z - 32) * 16) + y * 256;
+                        if (voxels22[index].GetMaterial() > 0) isSolid = true;
                     }
 
                     if (y == 255)
                     {
-                        this.lights[index] = 15;
+                        this.sunLights[i] = 15;
                         this.lightQueue.Enqueue(new int3(x, y, z));
                     }
                     else
                     {
-                        this.lights[index] = 0;
+                        this.sunLights[i] = 0;
                     }
 
-                    densities[index] = density;
-                    index++;
+                    this.isSolid[i] = isSolid;
+                    i++;
                 }
             }
         }
+    }
 
-        while (this.lightQueue.Count > 0)
-        {
-            int3 position = this.lightQueue.Dequeue();
-
-            index = position.x + position.z * 48 + position.y * 2304;
-            int lightValue = lights[index];
-
-            // -X Voxel (Left)
-            if (position.x > 0)
-            {
-                int indexLeft = index - 1;
-                if (densities[indexLeft] >= 0)
-                {
-                    int lightValueLeft = lights[indexLeft];
-
-                    if (lightValue - lightValueLeft > 1)
-                    {
-                        lightValueLeft = lightValue - 1;
-                        lights[indexLeft] = lightValueLeft;
-
-                        if (lightValueLeft > 1)
-                            this.lightQueue.Enqueue(position + new int3(-1, 0, 0));
-                    }
-                }
-            }
-
-            // +X Voxel (Right)
-            if (position.x < 48 - 1)
-            {
-                int indexRight = index + 1;
-                if (densities[indexRight] >= 0)
-                {
-                    int lightValueRight = lights[indexRight];
-
-                    if (lightValue - lightValueRight > 1)
-                    {
-                        lightValueRight = lightValue - 1;
-                        lights[indexRight] = lightValueRight;
-
-                        if (lightValueRight > 1)
-                            this.lightQueue.Enqueue(position + new int3(1, 0, 0));
-                    }
-                }
-            }
-
-            // -Z Voxel (Front)
-            if (position.z > 0)
-            {
-                int indexFront = index - 48;
-                if (densities[indexFront] >= 0)
-                {
-                    int lightValueFront = lights[indexFront];
-
-                    if (lightValue - lightValueFront > 1)
-                    {
-                        lightValueFront = lightValue - 1;
-                        lights[indexFront] = lightValueFront;
-
-                        if (lightValueFront > 1)
-                            this.lightQueue.Enqueue(position + new int3(0, 0, -1));
-                    }
-                } 
-            }
-
-            // +Z Voxel (Back)
-            if (position.z < 48 - 1)
-            {
-                int indexBack = index + 48;
-                if (densities[indexBack] >= 0)
-                {
-                    int lightValueBack = lights[indexBack];
-
-                    if (lightValue - lightValueBack > 1)
-                    {
-                        lightValueBack = lightValue - 1;
-                        lights[indexBack] = lightValueBack;
-
-                        if (lightValueBack > 1)
-                            this.lightQueue.Enqueue(position + new int3(0, 0, 1));
-                    }
-                } 
-            }
-
-            // -Y Voxel (Bottom)
-            if (position.y > 0)
-            {
-                int indexBottom = index - 2304;
-                if (densities[indexBottom] >= 0)
-                {
-                    int lightValueBottom = lights[indexBottom];
-
-                    if (lightValue == 15)
-                    {
-                        this.lights[indexBottom] = 15;
-                        this.lightQueue.Enqueue(position + new int3(0, -1, 0));
-                    }
-                    else if (lightValue - lightValueBottom > 1)
-                    {
-                        lightValueBottom = lightValue - 1;
-                        lights[indexBottom] = lightValueBottom;
-
-                        if (lightValueBottom > 1)
-                            this.lightQueue.Enqueue(position + new int3(0, -1, 0));
-                    }
-                }
-            }
-
-            // +Y Voxel (Top)
-            if (position.y < 256 - 1)
-            {
-                int indexTop = index + 2304;
-                if (densities[indexTop] >= 0)
-                {
-                    int lightValueTop = lights[indexTop];
-                    if (lightValue - lightValueTop > 1)
-                    {
-                        lightValueTop = lightValue - 1;
-                        lights[indexTop] = lightValueTop;
-
-                        if (lightValueTop > 1)
-                            this.lightQueue.Enqueue(position + new int3(0, 1, 0));
-                    }
-                }
-            }
-        }
-
-        index = 0;
-        int finalIndex = 0;
+    public void UpdateChunk()
+    {
+        int i = 0;
+        int index = 0;
         for (int y = 0; y <= 255; y++)
         {
             for (int z = 0; z <= 47; z++)
@@ -238,11 +258,11 @@ public struct SunLightJob : IJob
                 {
                     if (x >= 16 && x <= 31 && z >= 16 && z <= 31)
                     {
-                        this.sunLights[finalIndex] = (byte)lights[index];
-                        finalIndex++;
+                        this.lights[index] = (byte)((this.sunLights[i] & 0b_0000_1111) << 4);
+                        index++;
                     }
 
-                    index++;
+                    i++;
                 }
             }
         }
