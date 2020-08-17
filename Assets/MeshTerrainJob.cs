@@ -282,6 +282,7 @@ public struct MeshTerrainJob : IJob
             float weight1 = (float)u / 255.0f;
             */
 
+            /*
             float d0 = (float)density0;
             float d1 = (float)density1;
 
@@ -294,6 +295,7 @@ public struct MeshTerrainJob : IJob
 
             float weight1 = distA / dist;
             float weight0 = distB / dist;
+            */
 
             //if (weight0 >= 0.50f) { weight0 = 0.50f; weight1 = 0.50f; }
             //if (weight1 >= 0.50f) { weight1 = 0.50f; weight0 = 0.50f; }
@@ -338,20 +340,34 @@ public struct MeshTerrainJob : IJob
             }
             */
 
+            float weight0;
+            float weight1;
+
+            if (density0 < density1)
+            {
+                weight1 = math.abs((float)density0 + 1.0f) / 127.0f;
+                weight0 = 1.0f - weight1;
+            }
+            else
+            {
+                weight0 = math.abs((float)density1 + 1.0f) / 127.0f;
+                weight1 = 1.0f - weight0;
+            }
+
             float3 vertex;
-            vertex = weight1 * position0 + weight0 * position1;
-            float3 normal = weight1 * normal0 + weight0 * normal1;
+            vertex = weight0 * position0 + weight1 * position1;
+            float3 normal = weight0 * normal0 + weight1 * normal1;
 
             float sunLight = 0.0f;
 
             if (sunLight0 == 0.0f && sunLight1 > 0.0f)
             {
-                sunLight = sunLight1 - weight1;
+                sunLight = sunLight1 - weight0;
             }
             
             if (sunLight1 == 0.0f && sunLight0 > 0.0f)
             {
-                sunLight = sunLight0 - weight0;
+                sunLight = sunLight0 - weight1;
             }
 
             /*

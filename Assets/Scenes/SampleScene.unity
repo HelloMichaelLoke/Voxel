@@ -1316,7 +1316,7 @@ MonoBehaviour:
   runSpeed: 10
   crouchSpeed: 2.5
   jumpHeight: 4
-  mouseSensivity: {x: 180, y: 180}
+  mouseSensivity: {x: 222, y: 222}
   walkHeight: 1.73
   crouchHeight: 1
   playerCamera: {fileID: 6665169381862078186}

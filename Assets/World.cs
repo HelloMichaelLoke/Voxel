@@ -56,6 +56,28 @@ public struct WorldEditData
     }
 }
 
+public struct Voxel
+{
+    public byte right;  // +X
+    public byte left;   // -X
+    public byte top;    // +Y
+    public byte bottom; // -Y
+    public byte front;  // +Z
+    public byte back;   // -Z
+    public byte material;
+
+    public Voxel(byte right, byte left, byte top, byte bottom, byte front, byte back, byte material)
+    {
+        this.right = right;
+        this.left = left;
+        this.top = top;
+        this.bottom = bottom;
+        this.front = front;
+        this.back = back;
+        this.material = material;
+    }
+}
+
 public class World : MonoBehaviour
 {
     // Temp
