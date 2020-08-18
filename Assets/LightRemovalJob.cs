@@ -8,7 +8,7 @@ using UnityEngine;
 public struct LightRemovalJob : IJob
 {
     // Temporary Data
-    public NativeArray<sbyte> densities;
+    public NativeArray<Voxel> voxels;
     public NativeArray<byte> lights;
 
     // Queues
@@ -32,15 +32,15 @@ public struct LightRemovalJob : IJob
     */
 
     // Input Densities
-    public NativeArray<sbyte> densities00;
-    public NativeArray<sbyte> densities10;
-    public NativeArray<sbyte> densities20;
-    public NativeArray<sbyte> densities01;
-    public NativeArray<sbyte> densities11;
-    public NativeArray<sbyte> densities21;
-    public NativeArray<sbyte> densities02;
-    public NativeArray<sbyte> densities12;
-    public NativeArray<sbyte> densities22;
+    public NativeArray<Voxel> voxels00;
+    public NativeArray<Voxel> voxels10;
+    public NativeArray<Voxel> voxels20;
+    public NativeArray<Voxel> voxels01;
+    public NativeArray<Voxel> voxels11;
+    public NativeArray<Voxel> voxels21;
+    public NativeArray<Voxel> voxels02;
+    public NativeArray<Voxel> voxels12;
+    public NativeArray<Voxel> voxels22;
 
     // Input Lights
     public NativeArray<byte> lights00;
@@ -71,7 +71,7 @@ public struct LightRemovalJob : IJob
     private void MergeChunks()
     {
         int index = 0;
-        sbyte density = 0;
+        Voxel voxel;
         byte light = 0;
         int arrayPosition = 0;
 
@@ -81,62 +81,64 @@ public struct LightRemovalJob : IJob
             {
                 for (int x = 0; x <= 47; x++)
                 {
+                    voxel = new Voxel();
+
                     if (x <= 15 && z <= 15)
                     {
                         arrayPosition = x + (z * 16) + y * 256;
-                        density = densities00[arrayPosition];
+                        voxel = voxels00[arrayPosition];
                         light = lights00[arrayPosition];
                     }
                     else if (x >= 16 && x <= 31 && z <= 15)
                     {
                         arrayPosition = (x - 16) + (z * 16) + y * 256;
-                        density = densities10[arrayPosition];
+                        voxel = voxels10[arrayPosition];
                         light = lights10[arrayPosition];
                     }
                     else if (x >= 32 && z <= 15)
                     {
                         arrayPosition = (x - 32) + (z * 16) + y * 256;
-                        density = densities20[arrayPosition];
+                        voxel = voxels20[arrayPosition];
                         light = lights20[arrayPosition];
                     }
                     else if (x <= 15 && z >= 16 && z <= 31)
                     {
                         arrayPosition = x + ((z - 16) * 16) + y * 256;
-                        density = densities01[arrayPosition];
+                        voxel = voxels01[arrayPosition];
                         light = lights01[arrayPosition];
                     }
                     else if (x >= 16 && x <= 31 && z >= 16 && z <= 31)
                     {
                         arrayPosition = x - 16 + ((z - 16) * 16) + y * 256;
-                        density = densities11[arrayPosition];
+                        voxel = voxels11[arrayPosition];
                         light = lights11[arrayPosition];
                     }
                     else if (x >= 32 && z >= 16 && z <= 31)
                     {
                         arrayPosition = (x - 32) + ((z - 16) * 16) + y * 256;
-                        density = densities21[arrayPosition];
+                        voxel = voxels21[arrayPosition];
                         light = lights21[arrayPosition];
                     }
                     else if (x <= 15 && z >= 32)
                     {
                         arrayPosition = x + ((z - 32) * 16) + y * 256;
-                        density = densities02[arrayPosition];
+                        voxel = voxels02[arrayPosition];
                         light = lights02[arrayPosition];
                     }
                     else if (x >= 16 && x <= 31 && z >= 32)
                     {
                         arrayPosition = (x - 16) + ((z - 32) * 16) + y * 256;
-                        density = densities12[arrayPosition];
+                        voxel = voxels12[arrayPosition];
                         light = lights12[arrayPosition];
                     }
                     else if (x >= 32 && z >= 32)
                     {
                         arrayPosition = (x - 32) + ((z - 32) * 16) + y * 256;
-                        density = densities22[arrayPosition];
+                        voxel = voxels22[arrayPosition];
                         light = lights22[arrayPosition];
                     }
 
-                    densities[index] = density;
+                    voxels[index] = voxel;
                     lights[index] = light;
 
                     index++;
@@ -353,7 +355,7 @@ public struct LightRemovalJob : IJob
 
     private void SpreadSunLight(int index, int sunLight)
     {
-        if (sunLight > (int)this.GetSunLight(index) + 1 && this.densities[index] >= 0)
+        if (sunLight > (int)this.GetSunLight(index) + 1 && this.voxels[index].GetMaterial() == 0)
         {
             this.SetSunLight(index, (byte)(sunLight - 1));
             this.sunLightSpreadQueue.Enqueue(index);

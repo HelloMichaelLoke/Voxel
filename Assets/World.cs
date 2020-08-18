@@ -140,7 +140,7 @@ public class World : MonoBehaviour
         this.GenerateTerrains();
         this.GenerateLights(); // 3ms (SetSunLightsFromNative)
         this.GenerateMeshes(); // 9-14ms (creating mesh 5ms & uploading meshcollider 5ms)
-        //this.UpdateWorldEdit();
+        this.UpdateWorldEdit();
 
         /*
         Debug.Log("Terrain Queue: " + this.generateTerrainQueue.Count);
@@ -155,8 +155,6 @@ public class World : MonoBehaviour
     {
         this.DisposeJobs();
     }
-
-    /*
 
     private void UpdateWorldEdit()
     {
@@ -199,21 +197,21 @@ public class World : MonoBehaviour
 
             foreach (VoxelChange voxelChange in voxelChanges)
             {
-                if (voxelChange.oldMaterial != voxelChange.newMaterial)
+                if (voxelChange.oldVoxel.GetMaterial() != voxelChange.newVoxel.GetMaterial())
                 {
-                    this.chunks[voxelChange.chunkPosition].SetMaterial(voxelChange.index, voxelChange.newMaterial);
+                    this.chunks[voxelChange.chunkPosition].GetVoxel(voxelChange.index).SetMaterial(voxelChange.newVoxel.GetMaterial());
                     materialChanged = true;
+
+                    if ((voxelChange.oldVoxel.GetMaterial() == 0 && voxelChange.newVoxel.GetMaterial() > 0) || (voxelChange.oldVoxel.GetMaterial() > 0 && voxelChange.newVoxel.GetMaterial() == 0))
+                    {
+                        lightChanged = true;
+                    }
                 }
 
-                if (voxelChange.oldDensity != voxelChange.newDensity)
+                if (!voxelChange.oldVoxel.IsDensityEqualTo(voxelChange.newVoxel))
                 {
-                    this.chunks[voxelChange.chunkPosition].SetDensity(voxelChange.index, voxelChange.newDensity);
+                    this.chunks[voxelChange.chunkPosition].SetVoxel(voxelChange.index, voxelChange.newVoxel);
                     densityChanged = true;
-                }
-
-                if (Mathf.Sign(voxelChange.oldDensity) != Mathf.Sign(voxelChange.newDensity))
-                {
-                    lightChanged = true;
                 }
             }
 
@@ -275,7 +273,7 @@ public class World : MonoBehaviour
             // Queue light changes
             foreach (VoxelChange voxelChange in voxelChanges)
             {
-                if (Mathf.Sign(voxelChange.oldDensity) != Mathf.Sign(voxelChange.newDensity))
+                if ((voxelChange.oldVoxel.GetMaterial() == 0 && voxelChange.newVoxel.GetMaterial() > 0) || (voxelChange.oldVoxel.GetMaterial() > 0 && voxelChange.newVoxel.GetMaterial() == 0))
                 {
                     Vector3Int lightPosition = new Vector3Int(
                         voxelChange.index % 16,
@@ -286,7 +284,7 @@ public class World : MonoBehaviour
                     lightPosition.z += 16;
                     int lightIndex = lightPosition.x + lightPosition.z * 48 + lightPosition.y * 2304;
 
-                    if (voxelChange.newDensity < 0)
+                    if (voxelChange.newVoxel.GetMaterial() > 0)
                     {
                         this.lightRemovalJob.sunLightRemovalQueue.Enqueue(lightIndex);
                         this.lightRemovalJob.sourceLightRemovalQueue.Enqueue(lightIndex);
@@ -300,15 +298,15 @@ public class World : MonoBehaviour
             }
             
             this.lightRemovalJob.chunkPosition = chunkPosition;
-            this.lightRemovalJob.densities00.CopyFrom(this.chunks[chunkPosition + new Vector2Int(-1, -1)].GetDensities());
-            this.lightRemovalJob.densities10.CopyFrom(this.chunks[chunkPosition + new Vector2Int(0, -1)].GetDensities());
-            this.lightRemovalJob.densities20.CopyFrom(this.chunks[chunkPosition + new Vector2Int(1, -1)].GetDensities());
-            this.lightRemovalJob.densities01.CopyFrom(this.chunks[chunkPosition + new Vector2Int(-1, 0)].GetDensities());
-            this.lightRemovalJob.densities11.CopyFrom(this.chunks[chunkPosition + new Vector2Int(0, 0)].GetDensities());
-            this.lightRemovalJob.densities21.CopyFrom(this.chunks[chunkPosition + new Vector2Int(1, 0)].GetDensities());
-            this.lightRemovalJob.densities02.CopyFrom(this.chunks[chunkPosition + new Vector2Int(-1, 1)].GetDensities());
-            this.lightRemovalJob.densities12.CopyFrom(this.chunks[chunkPosition + new Vector2Int(0, 1)].GetDensities());
-            this.lightRemovalJob.densities22.CopyFrom(this.chunks[chunkPosition + new Vector2Int(1, 1)].GetDensities());
+            this.lightRemovalJob.voxels00.CopyFrom(this.chunks[chunkPosition + new Vector2Int(-1, -1)].GetVoxels());
+            this.lightRemovalJob.voxels10.CopyFrom(this.chunks[chunkPosition + new Vector2Int(0, -1)].GetVoxels());
+            this.lightRemovalJob.voxels20.CopyFrom(this.chunks[chunkPosition + new Vector2Int(1, -1)].GetVoxels());
+            this.lightRemovalJob.voxels01.CopyFrom(this.chunks[chunkPosition + new Vector2Int(-1, 0)].GetVoxels());
+            this.lightRemovalJob.voxels11.CopyFrom(this.chunks[chunkPosition + new Vector2Int(0, 0)].GetVoxels());
+            this.lightRemovalJob.voxels21.CopyFrom(this.chunks[chunkPosition + new Vector2Int(1, 0)].GetVoxels());
+            this.lightRemovalJob.voxels02.CopyFrom(this.chunks[chunkPosition + new Vector2Int(-1, 1)].GetVoxels());
+            this.lightRemovalJob.voxels12.CopyFrom(this.chunks[chunkPosition + new Vector2Int(0, 1)].GetVoxels());
+            this.lightRemovalJob.voxels22.CopyFrom(this.chunks[chunkPosition + new Vector2Int(1, 1)].GetVoxels());
             this.lightRemovalJob.lights00.CopyFrom(this.chunks[chunkPosition + new Vector2Int(-1, -1)].GetLights());
             this.lightRemovalJob.lights10.CopyFrom(this.chunks[chunkPosition + new Vector2Int(0, -1)].GetLights());
             this.lightRemovalJob.lights20.CopyFrom(this.chunks[chunkPosition + new Vector2Int(1, -1)].GetLights());
@@ -428,33 +426,24 @@ public class World : MonoBehaviour
             this.worldEditMeshJob.weights5678.Clear();
             this.worldEditMeshJob.breakPoints.Clear();
 
-            this.worldEditMeshJob.chunk00densities.CopyFrom(chunk00.GetDensities());
-            this.worldEditMeshJob.chunk00materials.CopyFrom(chunk00.GetMaterials());
-            this.worldEditMeshJob.chunk00lights.CopyFrom(chunk00.GetLights());
-            this.worldEditMeshJob.chunk10densities.CopyFrom(chunk10.GetDensities());
-            this.worldEditMeshJob.chunk10materials.CopyFrom(chunk10.GetMaterials());
-            this.worldEditMeshJob.chunk10lights.CopyFrom(chunk10.GetLights());
-            this.worldEditMeshJob.chunk20densities.CopyFrom(chunk20.GetDensities());
-            this.worldEditMeshJob.chunk20materials.CopyFrom(chunk20.GetMaterials());
-            this.worldEditMeshJob.chunk20lights.CopyFrom(chunk20.GetLights());
-            this.worldEditMeshJob.chunk01densities.CopyFrom(chunk01.GetDensities());
-            this.worldEditMeshJob.chunk01materials.CopyFrom(chunk01.GetMaterials());
-            this.worldEditMeshJob.chunk01lights.CopyFrom(chunk01.GetLights());
-            this.worldEditMeshJob.chunk11densities.CopyFrom(chunk11.GetDensities());
-            this.worldEditMeshJob.chunk11materials.CopyFrom(chunk11.GetMaterials());
-            this.worldEditMeshJob.chunk11lights.CopyFrom(chunk11.GetLights());
-            this.worldEditMeshJob.chunk21densities.CopyFrom(chunk21.GetDensities());
-            this.worldEditMeshJob.chunk21materials.CopyFrom(chunk21.GetMaterials());
-            this.worldEditMeshJob.chunk21lights.CopyFrom(chunk21.GetLights());
-            this.worldEditMeshJob.chunk02densities.CopyFrom(chunk02.GetDensities());
-            this.worldEditMeshJob.chunk02materials.CopyFrom(chunk02.GetMaterials());
-            this.worldEditMeshJob.chunk02lights.CopyFrom(chunk02.GetLights());
-            this.worldEditMeshJob.chunk12densities.CopyFrom(chunk12.GetDensities());
-            this.worldEditMeshJob.chunk12materials.CopyFrom(chunk12.GetMaterials());
-            this.worldEditMeshJob.chunk12lights.CopyFrom(chunk12.GetLights());
-            this.worldEditMeshJob.chunk22densities.CopyFrom(chunk22.GetDensities());
-            this.worldEditMeshJob.chunk22materials.CopyFrom(chunk22.GetMaterials());
-            this.worldEditMeshJob.chunk22lights.CopyFrom(chunk22.GetLights());
+            this.worldEditMeshJob.voxels00.CopyFrom(chunk00.GetVoxels());
+            this.worldEditMeshJob.lights00.CopyFrom(chunk00.GetLights());
+            this.worldEditMeshJob.voxels10.CopyFrom(chunk10.GetVoxels());
+            this.worldEditMeshJob.lights10.CopyFrom(chunk10.GetLights());
+            this.worldEditMeshJob.voxels20.CopyFrom(chunk20.GetVoxels());
+            this.worldEditMeshJob.lights20.CopyFrom(chunk20.GetLights());
+            this.worldEditMeshJob.voxels01.CopyFrom(chunk01.GetVoxels());
+            this.worldEditMeshJob.lights01.CopyFrom(chunk01.GetLights());
+            this.worldEditMeshJob.voxels11.CopyFrom(chunk11.GetVoxels());
+            this.worldEditMeshJob.lights11.CopyFrom(chunk11.GetLights());
+            this.worldEditMeshJob.voxels21.CopyFrom(chunk21.GetVoxels());
+            this.worldEditMeshJob.lights21.CopyFrom(chunk21.GetLights());
+            this.worldEditMeshJob.voxels02.CopyFrom(chunk02.GetVoxels());
+            this.worldEditMeshJob.lights02.CopyFrom(chunk02.GetLights());
+            this.worldEditMeshJob.voxels12.CopyFrom(chunk12.GetVoxels());
+            this.worldEditMeshJob.lights12.CopyFrom(chunk12.GetLights());
+            this.worldEditMeshJob.voxels22.CopyFrom(chunk22.GetVoxels());
+            this.worldEditMeshJob.lights22.CopyFrom(chunk22.GetLights());
 
             this.worldEditMeshJob.chunkPosition = new int2(chunkPosition.x, chunkPosition.y);
             this.worldEditMeshJobHandle = this.worldEditMeshJob.Schedule();
@@ -529,6 +518,8 @@ public class World : MonoBehaviour
                 this.chunkObjects[chunkPosition].SetCollider(i, colliderVertices, colliderIndices);
             }
 
+            Debug.Log("done");
+
             if (this.worldEditMeshQueue.Count == 0)
             {
                 this.isWorldEditBlocked = false;
@@ -537,8 +528,6 @@ public class World : MonoBehaviour
             }
         }
     }
-
-    */
 
     private void UpdateChunkQueue()
     {
@@ -953,22 +942,22 @@ public class World : MonoBehaviour
         // Light Removal Job
         this.lightRemovalJob = new LightRemovalJob()
         {
-            densities = new NativeArray<sbyte>(589824, Allocator.Persistent),
+            voxels = new NativeArray<Voxel>(589824, Allocator.Persistent),
             lights = new NativeArray<byte>(589824, Allocator.Persistent),
             sunLightSpreadQueue = new NativeQueue<int>(Allocator.Persistent),
             sunLightRemovalQueue = new NativeQueue<int>(Allocator.Persistent),
             sourceLightRemovalQueue = new NativeQueue<int>(Allocator.Persistent),
             sourceLightSpreadQueue = new NativeQueue<int>(Allocator.Persistent),
             chunksTouched = new NativeArray<bool>(9, Allocator.Persistent),
-            densities00 = new NativeArray<sbyte>(65536, Allocator.Persistent),
-            densities10 = new NativeArray<sbyte>(65536, Allocator.Persistent),
-            densities20 = new NativeArray<sbyte>(65536, Allocator.Persistent),
-            densities01 = new NativeArray<sbyte>(65536, Allocator.Persistent),
-            densities11 = new NativeArray<sbyte>(65536, Allocator.Persistent),
-            densities21 = new NativeArray<sbyte>(65536, Allocator.Persistent),
-            densities02 = new NativeArray<sbyte>(65536, Allocator.Persistent),
-            densities12 = new NativeArray<sbyte>(65536, Allocator.Persistent),
-            densities22 = new NativeArray<sbyte>(65536, Allocator.Persistent),
+            voxels00 = new NativeArray<Voxel>(65536, Allocator.Persistent),
+            voxels10 = new NativeArray<Voxel>(65536, Allocator.Persistent),
+            voxels20 = new NativeArray<Voxel>(65536, Allocator.Persistent),
+            voxels01 = new NativeArray<Voxel>(65536, Allocator.Persistent),
+            voxels11 = new NativeArray<Voxel>(65536, Allocator.Persistent),
+            voxels21 = new NativeArray<Voxel>(65536, Allocator.Persistent),
+            voxels02 = new NativeArray<Voxel>(65536, Allocator.Persistent),
+            voxels12 = new NativeArray<Voxel>(65536, Allocator.Persistent),
+            voxels22 = new NativeArray<Voxel>(65536, Allocator.Persistent),
             lights00 = new NativeArray<byte>(65536, Allocator.Persistent),
             lights10 = new NativeArray<byte>(65536, Allocator.Persistent),
             lights20 = new NativeArray<byte>(65536, Allocator.Persistent),
@@ -1124,22 +1113,22 @@ public class World : MonoBehaviour
         // Light Update Job
         //
 
-        this.lightRemovalJob.densities.Dispose();
+        this.lightRemovalJob.voxels.Dispose();
         this.lightRemovalJob.lights.Dispose();
         this.lightRemovalJob.sunLightSpreadQueue.Dispose();
         this.lightRemovalJob.sunLightRemovalQueue.Dispose();
         this.lightRemovalJob.sourceLightRemovalQueue.Dispose();
         this.lightRemovalJob.sourceLightSpreadQueue.Dispose();
         this.lightRemovalJob.chunksTouched.Dispose();
-        this.lightRemovalJob.densities00.Dispose();
-        this.lightRemovalJob.densities10.Dispose();
-        this.lightRemovalJob.densities20.Dispose();
-        this.lightRemovalJob.densities01.Dispose();
-        this.lightRemovalJob.densities11.Dispose();
-        this.lightRemovalJob.densities21.Dispose();
-        this.lightRemovalJob.densities02.Dispose();
-        this.lightRemovalJob.densities12.Dispose();
-        this.lightRemovalJob.densities22.Dispose();
+        this.lightRemovalJob.voxels00.Dispose();
+        this.lightRemovalJob.voxels10.Dispose();
+        this.lightRemovalJob.voxels20.Dispose();
+        this.lightRemovalJob.voxels01.Dispose();
+        this.lightRemovalJob.voxels11.Dispose();
+        this.lightRemovalJob.voxels21.Dispose();
+        this.lightRemovalJob.voxels02.Dispose();
+        this.lightRemovalJob.voxels12.Dispose();
+        this.lightRemovalJob.voxels22.Dispose();
         this.lightRemovalJob.lights00.Dispose();
         this.lightRemovalJob.lights10.Dispose();
         this.lightRemovalJob.lights20.Dispose();
@@ -1245,9 +1234,7 @@ public class World : MonoBehaviour
     // World Edit
     //
 
-    /*
-
-    public bool WorldEditDraw(Vector3 worldPosition, sbyte density, byte material)
+    public bool WorldEditDraw(Vector3 worldPosition, byte material)
     {
         if (this.isWorldEditBlocked)
             return false;
@@ -1265,40 +1252,15 @@ public class World : MonoBehaviour
             return false;
         }
 
-        if (density >= 0)
-        {
-            density = -1;
-        }
-
+        // Voxel
+        List<VoxelChange> voxelChanges = new List<VoxelChange>();
         Vector2Int chunkPosition = editPosition.chunkPosition;
         Chunk chunk = this.chunks[chunkPosition];
-        List<VoxelChange> voxelChanges = new List<VoxelChange>();
-
-        // Voxel
         int index = editPosition.index;
-        VoxelChange voxelChange = new VoxelChange(chunkPosition, index, chunk.GetDensity(index), density, chunk.GetMaterial(index), material);
+
+        Voxel newVoxel = new Voxel(1, 1, 1, 1, 1, 1, material);
+        VoxelChange voxelChange = new VoxelChange(chunkPosition, index, chunk.GetVoxel(index), newVoxel);
         voxelChanges.Add(voxelChange);
-
-        // Voxel Above
-        int indexAbove = index + 256;
-        sbyte densityAbove = chunk.GetDensity(indexAbove);
-        byte materialAbove = chunk.GetMaterial(indexAbove);
-        if (densityAbove >= 0)
-        {
-            sbyte newDensityAbove = (sbyte)Mathf.Clamp((int)density + 128, 0, 127);
-            VoxelChange voxelChangeAbove = new VoxelChange(chunkPosition, indexAbove, densityAbove, newDensityAbove, materialAbove, materialAbove);
-            voxelChanges.Add(voxelChangeAbove);
-        }
-
-        // Voxel Below
-        int indexBelow = index - 256;
-        sbyte densityBelow = chunk.GetDensity(indexBelow);
-        byte materialBelow = chunk.GetMaterial(indexBelow);
-        if (densityBelow <= -1)
-        {
-            VoxelChange voxelChangeBelow = new VoxelChange(chunkPosition, indexBelow, densityBelow, -127, materialBelow, materialBelow);
-            voxelChanges.Add(voxelChangeBelow);
-        }
 
         WorldEditData worldEditData = new WorldEditData(editPosition, voxelChanges);
 
@@ -1327,23 +1289,13 @@ public class World : MonoBehaviour
 
         Vector2Int chunkPosition = editPosition.chunkPosition;
         Chunk chunk = this.chunks[chunkPosition];
-        List<VoxelChange> voxelChanges = new List<VoxelChange>();
-
         int index = editPosition.index;
 
-        int indexBelow = index - 256;
-        sbyte densityBelow = chunk.GetDensity(indexBelow);
-        sbyte newDensity = 0;
-        if (densityBelow >= 0)
-        {
-            newDensity = 127;
-        }
-        else
-        {
-            newDensity = (sbyte)((int)densityBelow + 128);
-        }
+        List<VoxelChange> voxelChanges = new List<VoxelChange>();
 
-        VoxelChange voxelChange = new VoxelChange(chunkPosition, index, chunk.GetDensity(index), newDensity, chunk.GetMaterial(index), 255);
+        Voxel oldVoxel = this.chunks[chunkPosition].GetVoxel(index);
+        Voxel newVoxel = new Voxel();
+        VoxelChange voxelChange = new VoxelChange(chunkPosition, index, oldVoxel, newVoxel);
         voxelChanges.Add(voxelChange);
 
         WorldEditData worldEditData = new WorldEditData(editPosition, voxelChanges);
@@ -1352,7 +1304,6 @@ public class World : MonoBehaviour
         return true;
     }
 
-    */
     /*
     public bool WorldEditHeighten(Vector3 worldPosition, int strength = 1)
     {
@@ -1533,8 +1484,6 @@ public class World : MonoBehaviour
 
     // Other
 
-        /*
-
     public EditPosition GetClosestEditPosition(Vector3 worldPosition, bool solid)
     {
         EditPosition closestEditPosition = new EditPosition(Vector3.zero, Vector3Int.zero, Vector3Int.zero, Vector2Int.zero, -1);
@@ -1548,10 +1497,10 @@ public class World : MonoBehaviour
                 {
                     EditPosition editPosition = this.WorldToEditPosition(worldPosition + new Vector3(x, y, z));
 
-                    int density = this.chunks[editPosition.chunkPosition].GetDensity(editPosition.index);
+                    int material = this.chunks[editPosition.chunkPosition].GetVoxel(editPosition.index).GetMaterial();
                     bool isValid = false;
-                    if (solid) isValid = (density < 0);
-                    if (!solid) isValid = (density >= 0);
+                    if (solid) isValid = (material > 0);
+                    if (!solid) isValid = (material == 0);
 
                     float distance = Vector3.Distance(worldPosition, editPosition.roundedPosition);
                     if (distance < minDistance && isValid)
@@ -1565,7 +1514,6 @@ public class World : MonoBehaviour
         
         return closestEditPosition;
     }
-    */
 
         /*
     public float GetLightValue(Vector3 worldPosition)

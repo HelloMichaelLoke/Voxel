@@ -16,7 +16,6 @@ public class WorldEditController : MonoBehaviour
 
     void Update()
     {
-        /*
         RaycastHit hit;
         Ray ray = this.mainCamera.ScreenPointToRay(Input.mousePosition);
         int layerMask = 1 << 8;
@@ -30,13 +29,13 @@ public class WorldEditController : MonoBehaviour
                 this.visualizer.SetActive(true);
                 this.visualizer.transform.position = hit.point;
 
-                if (Vector3.Distance(hit.point, this.transform.position) >= 2.0f)
+                if (Vector3.Distance(hit.point, this.transform.position) >= 1.0f)
                 {
-                    if (Input.GetMouseButtonDown(0))
+                    if (Input.GetMouseButton(0))
                     {
-                        this.world.WorldEditDraw(hit.point, (sbyte)-128, (byte)3);
+                        this.world.WorldEditDraw(hit.point, (byte)3);
                     }
-                    else if (Input.GetMouseButtonDown(1))
+                    else if (Input.GetMouseButton(1))
                     {
                         this.world.WorldEditErase(hit.point);
                     }
@@ -51,6 +50,5 @@ public class WorldEditController : MonoBehaviour
             this.visualizer.SetActive(false);
             this.visualizerClosest.SetActive(false);
         }
-        */
     }
 }

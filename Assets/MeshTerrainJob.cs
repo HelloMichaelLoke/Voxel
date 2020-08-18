@@ -166,6 +166,7 @@ public struct MeshTerrainJob : IJob
     {
         if (x == 1 && z == 1 && y % 16 == 1)
         {
+            // TODO | Check if breakpoint was affected to avoid useless collider updates
             this.breakPoints.Add(new int2(this.vertices.Length, this.indices.Length));
         }
 

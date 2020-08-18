@@ -164,4 +164,22 @@ public struct Voxel
     {
         return (float)back / 255.0f;
     }
+
+    //
+    // Helpers
+    //
+
+    public bool IsDensityEqualTo(Voxel otherVoxel)
+    {
+        bool isEqual = true;
+
+        if (otherVoxel.GetRight() != this.GetRight()) isEqual = false;
+        if (otherVoxel.GetLeft() != this.GetLeft()) isEqual = false;
+        if (otherVoxel.GetTop() != this.GetTop()) isEqual = false;
+        if (otherVoxel.GetBottom() != this.GetBottom()) isEqual = false;
+        if (otherVoxel.GetFront() != this.GetFront()) isEqual = false;
+        if (otherVoxel.GetBack() != this.GetBack()) isEqual = false;
+
+        return isEqual;
+    }
 }
