@@ -675,27 +675,6 @@ public class World : MonoBehaviour
             Vector2Int chunkPosition = new Vector2Int(this.generateTerrainJob.chunkPosition.x, this.generateTerrainJob.chunkPosition.y);
             this.chunks.Add(chunkPosition, chunk);
 
-            bool showCubes = false;
-            if (showCubes)
-            {
-                int i = 0;
-                foreach (Voxel voxel in this.generateTerrainJob.voxels)
-                {
-                    if (voxel.GetMaterial() > 0)
-                    {
-                        Vector3Int position = new Vector3Int(
-                            (i % 16) + (chunkPosition.x * 16),
-                            Mathf.FloorToInt((float)i / 256.0f),
-                            Mathf.FloorToInt((float)i / 16.0f) % 16 + (chunkPosition.y * 16)
-                        );
-
-                        GameObject cube = GameObject.CreatePrimitive(PrimitiveType.Cube);
-                        cube.transform.position = position;
-                    }
-                    i++;
-                }
-            }
-
             if (this.IsInChunkDistance(chunkPosition, 1))
             {
                 this.generateLightsQueue.Enqueue(chunkPosition);

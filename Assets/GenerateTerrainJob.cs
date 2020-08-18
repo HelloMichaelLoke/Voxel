@@ -50,7 +50,7 @@ public struct GenerateTerrainJob : IJob
                     Voxel voxel = new Voxel();
                     float height = heights[heightIndex];
 
-                    if (y <= height)
+                    if (y <= height - 3.0f)
                     {
                         float caveNoiseCenter = this.GetCaves(new float3(x, y, z));
 
@@ -67,13 +67,21 @@ public struct GenerateTerrainJob : IJob
 
                             if (y + 1 >= height)
                             {
-                                float distance = math.abs(y - height);
-                                voxel.SetLeft(distance);
-                                voxel.SetRight(distance);
-                                voxel.SetTop(distance);
-                                voxel.SetBottom(distance);
-                                voxel.SetFront(distance);
-                                voxel.SetBack(distance);
+                                if (caveNoiseTop >= 0.0f)
+                                {
+                                    float distance = math.abs(caveNoiseCenter - caveNoiseTop);
+                                    voxel.SetTop((-caveNoiseCenter) / distance);
+                                }
+                                else
+                                {
+                                    float distance = math.abs(y - height);
+                                    voxel.SetLeft(distance);
+                                    voxel.SetRight(distance);
+                                    voxel.SetTop(distance);
+                                    voxel.SetBottom(distance);
+                                    voxel.SetFront(distance);
+                                    voxel.SetBack(distance);
+                                }
                             }
                             else
                             {
@@ -111,6 +119,16 @@ public struct GenerateTerrainJob : IJob
                         }
                     }
 
+                    if (y < height && y > height - 3.0f)
+                    {
+                        voxel.SetMaterial(this.GetMaterial(new float3(x, y, z)));
+                        voxel.SetTop(height - y);
+                        voxel.SetRight((1.0f / (height - this.GetHeight(new float2(x + 1.0f, z)))) * (height - y));
+                        voxel.SetLeft((1.0f / (height - this.GetHeight(new float2(x - 1.0f, z)))) * (height - y));
+                        voxel.SetFront((1.0f / (height - this.GetHeight(new float2(x, z + 1.0f)))) * (height - y));
+                        voxel.SetBack((1.0f / (height - this.GetHeight(new float2(x, z - 1.0f)))) * (height - y));
+                    }
+
                     if (y <= 2)
                     {
                         voxel.SetVoxel(255, 255, 255, 255, 255, 255, 1);
@@ -128,7 +146,8 @@ public struct GenerateTerrainJob : IJob
     private float GetHeight(float2 position)
     {
         // Settings
-        float maxHeight = 70.0f;
+        float minHeight = 50.0f;
+        float maxHeight = 40.0f;
 
         // Noises
         float noiseAFreq = 0.01f;
@@ -138,6 +157,7 @@ public struct GenerateTerrainJob : IJob
         float height = noiseA;
         height += 1.0f;
         height *= maxHeight / 2.0f;
+        height += minHeight;
         return height;
     }
 
