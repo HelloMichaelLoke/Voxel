@@ -13,7 +13,7 @@ public class World : MonoBehaviour
     public Material colliderMaterial;
 
     // World Settings
-    private int chunkDistance = 7;
+    private int chunkDistance = 10;
 
     // Player Information
     public GameObject playerGameObject;

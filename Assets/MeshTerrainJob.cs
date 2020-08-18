@@ -209,8 +209,8 @@ public struct MeshTerrainJob : IJob
         float matId7 = (float)this.cornerVoxels[6].GetMaterial();
         float matId8 = (float)this.cornerVoxels[7].GetMaterial();
 
-        float4 matIds1234 = new float4(matId1, matId2, matId3, matId4);
-        float4 matIds5678 = new float4(matId5, matId6, matId7, matId8);
+        float4 matIds1234 = new float4(matId1 - 1.0f, matId2 - 1.0f, matId3 - 1.0f, matId4 - 1.0f);
+        float4 matIds5678 = new float4(matId5 - 1.0f, matId6 - 1.0f, matId7 - 1.0f, matId8 - 1.0f);
 
         byte caseIndex = 0;
 
