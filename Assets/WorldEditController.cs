@@ -8,6 +8,7 @@ public class WorldEditController : MonoBehaviour
     public Camera mainCamera;
     public GameObject visualizer;
     public GameObject visualizerClosest;
+    public LineRenderer line;
 
     void Start()
     {
@@ -16,6 +17,40 @@ public class WorldEditController : MonoBehaviour
 
     void Update()
     {
+        /*
+        Vector3 editPosition = this.mainCamera.transform.position + this.mainCamera.transform.forward * 3.0f;
+
+        this.visualizer.transform.position = editPosition;
+
+        EditPosition closestEditPosition = this.world.GetClosestEditPosition(editPosition, true);
+        this.visualizerClosest.transform.position = closestEditPosition.roundedPosition;
+
+        Vector3 relativeDirection = editPosition - closestEditPosition.roundedPosition;
+        if (relativeDirection.x == 0.0f && relativeDirection.y == 0.0f && relativeDirection.z == 0.0f) relativeDirection.y = 1.0f;
+
+        float absX = Mathf.Abs(relativeDirection.x);
+        float absY = Mathf.Abs(relativeDirection.y);
+        float absZ = Mathf.Abs(relativeDirection.z);
+
+        Vector3Int direction = new Vector3Int(0, 0, 0);
+
+        if (absX >= absY && absX >= absZ) direction.x = (int)Mathf.Sign(relativeDirection.x);
+        else if (absY >= absX && absY >= absZ) direction.y = (int)Mathf.Sign(relativeDirection.y);
+        else if (absZ >= absX && absZ >= absY) direction.z = (int)Mathf.Sign(relativeDirection.z);
+
+        line.SetPositions(new Vector3[] { closestEditPosition.roundedPosition, closestEditPosition.roundedPosition + direction });
+
+        
+        if (Input.GetMouseButton(0))
+        {
+            this.world.WorldEditAdd(editPosition, 1.0f / 255.0f);
+        }
+        else if (Input.GetMouseButton(1))
+        {
+            this.world.WorldEditSubstract(editPosition, 1.0f / 255.0f);
+        }
+        */
+
         RaycastHit hit;
         Ray ray = this.mainCamera.ScreenPointToRay(Input.mousePosition);
         int layerMask = 1 << 8;
@@ -41,8 +76,8 @@ public class WorldEditController : MonoBehaviour
                     }
                 }
 
-                //this.visualizerClosest.SetActive(true);
-                //this.visualizerClosest.transform.position = worldPosition;
+                this.visualizerClosest.SetActive(true);
+                this.visualizerClosest.transform.position = Vector3Int.RoundToInt(hit.point);
             }
         }
         else

@@ -83,6 +83,7 @@ public class ChunkObject
         this.rendererMesh.SetUVs(2, mats1234);
         this.rendererMesh.SetUVs(3, mats5678);
         this.rendererMesh.SetUVs(4, lights);
+        this.rendererMesh.RecalculateNormals();
         this.rendererMesh.RecalculateBounds();
     }
 

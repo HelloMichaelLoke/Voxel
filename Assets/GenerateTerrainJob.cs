@@ -215,9 +215,11 @@ public struct GenerateTerrainJob : IJob
             val = math.lerp(val, 0.0f, math.smoothstep(seaLevel, -1.0f, val));
         }
 
+        val = (val + 1.0f) / 2.0f;
+
         float amplitude = (1.0f + noise.snoise(pos * 0.0015f)) / 2.0f;
 
-        return 20.0f + amplitude * val * 220.0f;
+        return amplitude * val * 220.0f;
     }
 
     public float octaves(float2 pos, float octaves)

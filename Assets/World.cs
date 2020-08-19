@@ -1304,44 +1304,205 @@ public class World : MonoBehaviour
         return true;
     }
 
-    /*
-    public bool WorldEditHeighten(Vector3 worldPosition, int strength = 1)
+    public bool WorldEditAdd(Vector3 worldPosition, float strength)
     {
-        if (this.isWorldEditBlocked || strength < 1 || strength > 127)
-            return false;
-
-        Vector3Int editPosition = this.WorldToEditPosition(worldPosition);
-        Vector2Int chunkPosition = new Vector2Int(editPosition.x, editPosition.y);
-        int arrayPosition = editPosition.z;
-
-        if (!this.chunks.ContainsKey(chunkPosition))
-            return false;
-
-        Chunk chunk = this.chunks[chunkPosition];
-        int density = (int)chunk.GetDensity(arrayPosition);
-
-        if (density >= 0 || density == -128)
-            return false;
-
-        int densityAbove = (int)chunk.GetDensity(arrayPosition + 256);
-        int newDensity = density;
-
-        newDensity -= strength;
-        newDensity = Mathf.Clamp(newDensity, -128, -1);
-
-        chunk.SetDensity(arrayPosition, (sbyte)newDensity);
-
-        if (densityAbove >= 0)
+        if (this.isWorldEditBlocked)
         {
-            chunk.SetDensity(arrayPosition + 256, (sbyte)(newDensity + 128));
+            return false;
         }
 
-        WorldEditData worldEditData = new WorldEditData(chunkPosition, arrayPosition, (sbyte)newDensity);
+        EditPosition editPosition = this.GetClosestEditPosition(worldPosition, true);
+
+        Vector2Int chunkPosition = new Vector2Int(editPosition.chunkPosition.x, editPosition.chunkPosition.y);
+        int index = editPosition.index;
+        Chunk chunk = this.chunks[chunkPosition];
+
+        if (!this.chunks.ContainsKey(chunkPosition))
+        {
+            return false;
+        }
+
+        Voxel oldVoxel = chunk.GetVoxel(index);
+        Voxel newVoxel = new Voxel();
+
+        float3 relativeDirection = worldPosition - editPosition.roundedPosition;
+        if (relativeDirection.x == 0.0f && relativeDirection.y == 0.0f && relativeDirection.z == 0.0f) relativeDirection.y = 1.0f;
+
+        float absX = math.abs(relativeDirection.x);
+        float absY = math.abs(relativeDirection.y);
+        float absZ = math.abs(relativeDirection.z);
+
+        int3 direction = new int3(0, 0, 0);
+
+        if (absX >= absY && absX >= absZ) direction.x = (int)math.sign(relativeDirection.x);
+        else if (absY >= absX && absY >= absZ) direction.y = (int)math.sign(relativeDirection.y);
+        else if (absZ >= absX && absZ >= absY) direction.z = (int)math.sign(relativeDirection.z);
+
+        if (direction.x == 1)
+        {
+            newVoxel.SetRight(math.clamp(oldVoxel.GetRight() + strength, 0.0f, 1.0f));
+        }
+        else
+        {
+            newVoxel.SetRight(oldVoxel.GetRight());
+        }
+
+        if (direction.x == -1)
+        {
+            newVoxel.SetLeft(math.clamp(oldVoxel.GetLeft() + strength, 0.0f, 1.0f));
+        }
+        else
+        {
+            newVoxel.SetLeft(oldVoxel.GetLeft());
+        }
+
+        if (direction.y == 1)
+        {
+            newVoxel.SetTop(math.clamp(oldVoxel.GetTop() + strength, 0.0f, 1.0f));
+        }
+        else
+        {
+            newVoxel.SetTop(oldVoxel.GetTop());
+        }
+
+        if (direction.y == -1)
+        {
+            newVoxel.SetBottom(math.clamp(oldVoxel.GetBottom() + strength, 0.0f, 1.0f));
+        }
+        else
+        {
+            newVoxel.SetBottom(oldVoxel.GetBottom());
+        }
+
+        if (direction.z == 1)
+        {
+            newVoxel.SetFront(math.clamp(oldVoxel.GetFront() + strength, 0.0f, 1.0f));
+        }
+        else
+        {
+            newVoxel.SetFront(oldVoxel.GetFront());
+        }
+
+        if (direction.z == -1)
+        {
+            newVoxel.SetBack(math.clamp(oldVoxel.GetBack() + strength, 0.0f, 1.0f));
+        }
+        else
+        {
+            newVoxel.SetBack(oldVoxel.GetBack());
+        }
+
+        newVoxel.SetMaterial(oldVoxel.GetMaterial());
+
+        List<VoxelChange> voxelChanges = new List<VoxelChange>();
+        VoxelChange voxelChange = new VoxelChange(chunkPosition, index, oldVoxel, newVoxel);
+        voxelChanges.Add(voxelChange);
+
+        WorldEditData worldEditData = new WorldEditData(editPosition, voxelChanges);
         this.worldEditQueue.Enqueue(worldEditData);
 
         return true;
     }
-    */
+
+    public bool WorldEditSubstract(Vector3 worldPosition, float strength)
+    {
+        if (this.isWorldEditBlocked)
+        {
+            return false;
+        }
+
+        EditPosition editPosition = this.GetClosestEditPosition(worldPosition, true);
+
+        Vector2Int chunkPosition = new Vector2Int(editPosition.chunkPosition.x, editPosition.chunkPosition.y);
+        int index = editPosition.index;
+        Chunk chunk = this.chunks[chunkPosition];
+
+        if (!this.chunks.ContainsKey(chunkPosition))
+        {
+            return false;
+        }
+
+        Voxel oldVoxel = chunk.GetVoxel(index);
+        Voxel newVoxel = new Voxel();
+
+        float3 relativeDirection = worldPosition - editPosition.roundedPosition;
+        if (relativeDirection.x == 0.0f && relativeDirection.y == 0.0f && relativeDirection.z == 0.0f) relativeDirection.y = 1.0f;
+
+        float absX = math.abs(relativeDirection.x);
+        float absY = math.abs(relativeDirection.y);
+        float absZ = math.abs(relativeDirection.z);
+
+        int3 direction = new int3(0, 0, 0);
+
+        if (absX >= absY && absX >= absZ) direction.x = (int)math.sign(relativeDirection.x);
+        else if (absY >= absX && absY >= absZ) direction.y = (int)math.sign(relativeDirection.y);
+        else if (absZ >= absX && absZ >= absY) direction.z = (int)math.sign(relativeDirection.z);
+
+        if (direction.x == 1)
+        {
+            newVoxel.SetRight(math.clamp(oldVoxel.GetRight() - strength, 0.0f, 1.0f));
+        }
+        else
+        {
+            newVoxel.SetRight(oldVoxel.GetRight());
+        }
+
+        if (direction.x == -1)
+        {
+            newVoxel.SetLeft(math.clamp(oldVoxel.GetLeft() - strength, 0.0f, 1.0f));
+        }
+        else
+        {
+            newVoxel.SetLeft(oldVoxel.GetLeft());
+        }
+
+        if (direction.y == 1)
+        {
+            newVoxel.SetTop(math.clamp(oldVoxel.GetTop() - strength, 0.0f, 1.0f));
+        }
+        else
+        {
+            newVoxel.SetTop(oldVoxel.GetTop());
+        }
+
+        if (direction.y == -1)
+        {
+            newVoxel.SetBottom(math.clamp(oldVoxel.GetBottom() - strength, 0.0f, 1.0f));
+        }
+        else
+        {
+            newVoxel.SetBottom(oldVoxel.GetBottom());
+        }
+
+        if (direction.z == 1)
+        {
+            newVoxel.SetFront(math.clamp(oldVoxel.GetFront() - strength, 0.0f, 1.0f));
+        }
+        else
+        {
+            newVoxel.SetFront(oldVoxel.GetFront());
+        }
+
+        if (direction.z == -1)
+        {
+            newVoxel.SetBack(math.clamp(oldVoxel.GetBack() - strength, 0.0f, 1.0f));
+        }
+        else
+        {
+            newVoxel.SetBack(oldVoxel.GetBack());
+        }
+
+        newVoxel.SetMaterial(oldVoxel.GetMaterial());
+
+        List<VoxelChange> voxelChanges = new List<VoxelChange>();
+        VoxelChange voxelChange = new VoxelChange(chunkPosition, index, oldVoxel, newVoxel);
+        voxelChanges.Add(voxelChange);
+
+        WorldEditData worldEditData = new WorldEditData(editPosition, voxelChanges);
+        this.worldEditQueue.Enqueue(worldEditData);
+
+        return true;
+    }
 
     //
     // Player Information

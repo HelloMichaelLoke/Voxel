@@ -40,6 +40,7 @@
                 struct v2f
                 {
                     float4 pos : SV_POSITION;
+                    fixed4 diff : COLOR0;
                     float3 normal : NORMAL;
                     float2 weight12 : TEXCOORD0;
                     float2 weight34 : TEXCOORD1;
@@ -66,6 +67,8 @@
                     o.mat1234 = i.texcoord2;
                     o.mat5678 = i.texcoord3;
                     o.light = i.texcoord4;
+                    half nl = max(0, dot(o.worldNormal, _WorldSpaceLightPos0.xyz));
+                    o.diff = nl * _LightColor0;
                     return o;
                 }
 
@@ -76,96 +79,6 @@
                 {
                     float3 weight = abs(i.worldNormal);
                     weight /= weight.x + weight.y + weight.z;
-                    
-                    ////////////////////////////////////////////////////////////////////////////////////
-                    /*
-                    float flatMat = 0.0;
-                    float flatWeight = 0.0;
-
-                    if (i.weight12.x != 0.0)
-                    {
-                        if (i.weight12.x >= flatWeight)
-                        {
-                            flatWeight = i.weight12.x;
-                            flatMat = i.mat1234.x;
-                        }
-                    }
-
-                    if (i.weight12.y != 0.0)
-                    {
-                        if (i.weight12.y >= flatWeight)
-                        {
-                            flatWeight = i.weight12.y;
-                            flatMat = i.mat1234.y;
-                        }
-                    }
-
-                    if (i.weight34.x != 0.0)
-                    {
-                        if (i.weight34.x >= flatWeight)
-                        {
-                            flatWeight = i.weight34.x;
-                            flatMat = i.mat1234.z;
-                        }
-                    }
-
-                    if (i.weight34.y != 0.0)
-                    {
-                        if (i.weight34.y >= flatWeight)
-                        {
-                            flatWeight = i.weight34.y;
-                            flatMat = i.mat1234.w;
-                        }
-                    }
-
-                    if (i.weight56.x != 0.0)
-                    {
-                        if (i.weight56.x >= flatWeight)
-                        {
-                            flatWeight = i.weight56.x;
-                            flatMat = i.mat5678.x;
-                        }
-                    }
-
-                    if (i.weight56.y != 0.0)
-                    {
-                        if (i.weight56.y >= flatWeight)
-                        {
-                            flatWeight = i.weight56.y;
-                            flatMat = i.mat5678.y;
-                        }
-                    }
-
-                    if (i.weight78.x != 0.0)
-                    {
-                        if (i.weight78.x >= flatWeight)
-                        {
-                            flatWeight = i.weight78.x;
-                            flatMat = i.mat5678.z;
-                        }
-                    }
-
-                    if (i.weight78.y != 0.0)
-                    {
-                        if (i.weight78.y >= flatWeight)
-                        {
-                            flatWeight = i.weight78.y;
-                            flatMat = i.mat5678.w;
-                        }
-                    }
-
-                    float3 flatAlbedoZ = UNITY_SAMPLE_TEX2DARRAY(_TexColor, float3(i.worldPos.xy, flatMat)) * weight.z;
-                    float3 flatAlbedoY = UNITY_SAMPLE_TEX2DARRAY(_TexColor, float3(i.worldPos.xz, flatMat)) * weight.y;
-                    float3 flatAlbedoX = UNITY_SAMPLE_TEX2DARRAY(_TexColor, float3(i.worldPos.yz, flatMat)) * weight.x;
-                    float3 flatAlbedo = flatAlbedoX + flatAlbedoY + flatAlbedoZ;
-
-                    float flatLight = max(i.light.x * _SunLight, i.light.y);
-
-                    float3 flatColor = (_TexBrightness + (1.0 - _TexBrightness) * flatLight) * flatAlbedo;
-
-                    return float4(flatColor.x, flatColor.y, flatColor.z, 1.0);
-                    */
-                    /////////////////////////////////////////////////////////////////////////////////////////
 
                     float mat = -1.0;
                     float height = 0.0;
@@ -344,7 +257,7 @@
                     float3 albedoX = UNITY_SAMPLE_TEX2DARRAY(_TexColor, float3(i.worldPos.yz, mat)) * weight.x;
                     float3 albedo = albedoX + albedoY + albedoZ;
 
-                    float light = max(i.light.x * _SunLight, i.light.y);
+                    float light = max(i.light.x * _SunLight * i.diff, i.light.y);
                     float camDist = distance(_WorldSpaceCameraPos, (i.worldPos / _TexScale));
 
                     float lightThreshold = 0.1;
