@@ -192,7 +192,7 @@ public struct GenerateTerrainJob : IJob
 
     private float GetHeightA(float2 position)
     {
-        float2 pos = new float2(position.x, position.y) * 0.0003f;
+        float2 pos = new float2(position.x, position.y - 10.0f) * 0.0003f;
 
         float2 q = new float2(noise.snoise(pos), noise.snoise(pos + new float2(-12.700f, 11.820f)));
         float2 r = pos + 4.0f * q;

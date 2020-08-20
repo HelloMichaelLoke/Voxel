@@ -13,7 +13,7 @@ public class World : MonoBehaviour
     public Material colliderMaterial;
 
     // World Settings
-    private int chunkDistance = 10;
+    private int chunkDistance = 5;
 
     // Player Information
     public GameObject playerGameObject;
@@ -972,6 +972,7 @@ public class World : MonoBehaviour
         // Mesh Job
         this.meshTerrainJob = new MeshTerrainJob()
         {
+            vertexNormals = new NativeHashMap<Vector3, Vector3>(500000, Allocator.Persistent),
             breakPoints = new NativeList<int2>(Allocator.Persistent),
             voxelsMerged = new NativeArray<Voxel>(92416, Allocator.Persistent),
             lightsMerged = new NativeArray<byte>(92416, Allocator.Persistent),
@@ -1008,8 +1009,8 @@ public class World : MonoBehaviour
             weights5678 = new NativeList<Vector4>(Allocator.Persistent),
             cornerPositions = new NativeArray<float3>(8, Allocator.Persistent),
             cornerVoxels = new NativeArray<Voxel>(8, Allocator.Persistent),
-            cornerNormals = new NativeArray<float3>(8, Allocator.Persistent),
             cornerLights = new NativeArray<float2>(8, Allocator.Persistent),
+            cornerIndices = new NativeArray<int>(8, Allocator.Persistent),
             cellIndices = new NativeList<int>(Allocator.Persistent),
             mappedIndices = new NativeList<ushort>(Allocator.Persistent)
         };
@@ -1023,6 +1024,7 @@ public class World : MonoBehaviour
         // World Edit Mesh Job
         this.worldEditMeshJob = new MeshTerrainJob()
         {
+            vertexNormals = new NativeHashMap<Vector3, Vector3>(500000, Allocator.Persistent),
             breakPoints = new NativeList<int2>(Allocator.Persistent),
             voxelsMerged = new NativeArray<Voxel>(92416, Allocator.Persistent),
             lightsMerged = new NativeArray<byte>(92416, Allocator.Persistent),
@@ -1059,8 +1061,8 @@ public class World : MonoBehaviour
             weights5678 = new NativeList<Vector4>(Allocator.Persistent),
             cornerPositions = new NativeArray<float3>(8, Allocator.Persistent),
             cornerVoxels = new NativeArray<Voxel>(8, Allocator.Persistent),
-            cornerNormals = new NativeArray<float3>(8, Allocator.Persistent),
             cornerLights = new NativeArray<float2>(8, Allocator.Persistent),
+            cornerIndices = new NativeArray<int>(8, Allocator.Persistent),
             cellIndices = new NativeList<int>(Allocator.Persistent),
             mappedIndices = new NativeList<ushort>(Allocator.Persistent)
         };
@@ -1143,6 +1145,7 @@ public class World : MonoBehaviour
         // Mesh Terrain Job
         //
 
+        this.meshTerrainJob.vertexNormals.Dispose();
         this.meshTerrainJob.breakPoints.Dispose();
         this.meshTerrainJob.voxelsMerged.Dispose();
         this.meshTerrainJob.lightsMerged.Dispose();
@@ -1161,8 +1164,8 @@ public class World : MonoBehaviour
         this.meshTerrainJob.weights5678.Dispose();
         this.meshTerrainJob.cornerPositions.Dispose();
         this.meshTerrainJob.cornerVoxels.Dispose();
-        this.meshTerrainJob.cornerNormals.Dispose();
         this.meshTerrainJob.cornerLights.Dispose();
+        this.meshTerrainJob.cornerIndices.Dispose();
         this.meshTerrainJob.cellIndices.Dispose();
         this.meshTerrainJob.mappedIndices.Dispose();
         this.meshTerrainJob.voxels00.Dispose();
@@ -1188,6 +1191,7 @@ public class World : MonoBehaviour
         // Mesh Update Job
         //
 
+        this.worldEditMeshJob.vertexNormals.Dispose();
         this.worldEditMeshJob.breakPoints.Dispose();
         this.worldEditMeshJob.voxelsMerged.Dispose();
         this.worldEditMeshJob.lightsMerged.Dispose();
@@ -1206,8 +1210,8 @@ public class World : MonoBehaviour
         this.worldEditMeshJob.weights5678.Dispose();
         this.worldEditMeshJob.cornerPositions.Dispose();
         this.worldEditMeshJob.cornerVoxels.Dispose();
-        this.worldEditMeshJob.cornerNormals.Dispose();
         this.worldEditMeshJob.cornerLights.Dispose();
+        this.worldEditMeshJob.cornerIndices.Dispose();
         this.worldEditMeshJob.cellIndices.Dispose();
         this.worldEditMeshJob.mappedIndices.Dispose();
         this.worldEditMeshJob.voxels00.Dispose();

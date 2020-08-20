@@ -169,6 +169,11 @@ public struct Voxel
     // Helpers
     //
 
+    public bool IsSolid()
+    {
+        return (this.GetMaterial() > 0);
+    }
+
     public bool IsDensityEqualTo(Voxel otherVoxel)
     {
         bool isEqual = true;

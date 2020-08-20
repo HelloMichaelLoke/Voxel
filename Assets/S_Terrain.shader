@@ -16,11 +16,11 @@
                 LOD 200
 
                 CGPROGRAM
+                #include "UnityCG.cginc"
+                #include "UnityLightingCommon.cginc"
                 #pragma vertex vert
                 #pragma fragment frag
                 #pragma require 2darray
-                #include "UnityCG.cginc"
-                #include "UnityLightingCommon.cginc"
 
                 float _TexScale;
                 float _TexBrightness;
@@ -268,13 +268,13 @@
                     }
 
                     //light = pow(light, 1.0 / 2.2);
-                    float3 color = (_TexBrightness + (1.0 - _TexBrightness) * light) * albedo;
+                    float3 color = i.diff;
+                    //float3 color = (_TexBrightness + (1.0 - _TexBrightness) * light)* albedo;
 
                     //color = i.worldNormal;
                     //color = float3(1.0, 1.0, 1.0) * light;
-                    
 
-                    return float4(color.x, color.y, color.z, 1.0);
+                    return float4(color.x, color.y, color.z, 1.0f);
                 }
                 ENDCG
             }
