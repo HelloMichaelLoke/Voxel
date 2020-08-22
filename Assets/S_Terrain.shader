@@ -257,7 +257,8 @@
                     float3 albedoX = UNITY_SAMPLE_TEX2DARRAY(_TexColor, float3(i.worldPos.yz, mat)) * weight.x;
                     float3 albedo = albedoX + albedoY + albedoZ;
 
-                    float light = max(i.light.x * _SunLight * i.diff, i.light.y);
+                    float diffuse = 0.5 + 0.5 * i.diff;
+                    float light = max(i.light.x * _SunLight * diffuse, i.light.y);
                     float camDist = distance(_WorldSpaceCameraPos, (i.worldPos / _TexScale));
 
                     float lightThreshold = 0.1;
@@ -274,10 +275,10 @@
                     //float3 color = i.diff;
                     
                     // Voxel Light
-                    float3 color = max(i.light.x, i.light.y) * float3(1.0, 1.0, 1.0);
+                    //float3 color = max(i.light.x, i.light.y) * float3(1.0, 1.0, 1.0);
 
                     // Albedo with Light
-                    //float3 color = (_TexBrightness + (1.0 - _TexBrightness) * light) * albedo;
+                    float3 color = (_TexBrightness + (1.0 - _TexBrightness) * light) * albedo;
 
                     //color = i.worldNormal;
                     //color = float3(1.0, 1.0, 1.0) * light;

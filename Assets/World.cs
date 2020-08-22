@@ -13,7 +13,7 @@ public class World : MonoBehaviour
     public Material colliderMaterial;
 
     // World Settings
-    private int chunkDistance = 5;
+    private int chunkDistance = 8;
 
     // Player Information
     public GameObject playerGameObject;
@@ -197,21 +197,21 @@ public class World : MonoBehaviour
 
             foreach (VoxelChange voxelChange in voxelChanges)
             {
-                if (voxelChange.oldVoxel.GetMaterial() != voxelChange.newVoxel.GetMaterial())
-                {
-                    this.chunks[voxelChange.chunkPosition].GetVoxel(voxelChange.index).SetMaterial(voxelChange.newVoxel.GetMaterial());
-                    materialChanged = true;
-
-                    if ((voxelChange.oldVoxel.GetMaterial() == 0 && voxelChange.newVoxel.GetMaterial() > 0) || (voxelChange.oldVoxel.GetMaterial() > 0 && voxelChange.newVoxel.GetMaterial() == 0))
-                    {
-                        lightChanged = true;
-                    }
-                }
-
                 if (voxelChange.oldVoxel.GetDensity() != voxelChange.newVoxel.GetDensity())
                 {
                     this.chunks[voxelChange.chunkPosition].SetVoxel(voxelChange.index, voxelChange.newVoxel);
                     densityChanged = true;
+                }
+
+                if (voxelChange.oldVoxel.GetMaterial() != voxelChange.newVoxel.GetMaterial())
+                {
+                    this.chunks[voxelChange.chunkPosition].SetVoxel(voxelChange.index, voxelChange.newVoxel);
+                    materialChanged = true;
+                }
+
+                if (voxelChange.oldVoxel.IsSolid() != voxelChange.newVoxel.IsSolid())
+                {
+                    lightChanged = true;
                 }
             }
 
@@ -273,7 +273,7 @@ public class World : MonoBehaviour
             // Queue light changes
             foreach (VoxelChange voxelChange in voxelChanges)
             {
-                if ((voxelChange.oldVoxel.GetMaterial() == 0 && voxelChange.newVoxel.GetMaterial() > 0) || (voxelChange.oldVoxel.GetMaterial() > 0 && voxelChange.newVoxel.GetMaterial() == 0))
+                if (voxelChange.oldVoxel.IsSolid() != voxelChange.newVoxel.IsSolid())
                 {
                     Vector3Int lightPosition = new Vector3Int(
                         voxelChange.index % 16,
@@ -284,7 +284,7 @@ public class World : MonoBehaviour
                     lightPosition.z += 16;
                     int lightIndex = lightPosition.x + lightPosition.z * 48 + lightPosition.y * 2304;
 
-                    if (voxelChange.newVoxel.GetMaterial() > 0)
+                    if (voxelChange.newVoxel.IsSolid())
                     {
                         this.lightRemovalJob.sunLightRemovalQueue.Enqueue(lightIndex);
                         this.lightRemovalJob.sourceLightRemovalQueue.Enqueue(lightIndex);
@@ -1310,6 +1310,118 @@ public class World : MonoBehaviour
         return true;
     }
 
+    public bool WorldEditAdd(Vector3 worldPosition, int strength)
+    {
+        if (this.isWorldEditBlocked)
+            return false;
+
+        EditPosition editPosition = this.GetClosestEditPosition(worldPosition, true);
+
+        if (editPosition.index == -1)
+        {
+            Debug.Log("WorldEditDraw: Didn't find a close position.");
+            return false;
+        }
+
+        if (!this.chunks.ContainsKey(editPosition.chunkPosition))
+        {
+            return false;
+        }
+
+        // Voxel
+        List<VoxelChange> voxelChanges = new List<VoxelChange>();
+        Vector2Int chunkPosition = editPosition.chunkPosition;
+        Chunk chunk = this.chunks[chunkPosition];
+        int index = editPosition.index;
+
+        Voxel oldVoxel = chunk.GetVoxel(index);
+        int newDensity = (int)oldVoxel.GetDensity() - strength;
+        newDensity = math.clamp(newDensity, -128, -1);
+        Voxel newVoxel = new Voxel((sbyte)newDensity, oldVoxel.GetMaterial());
+        VoxelChange voxelChange = new VoxelChange(chunkPosition, index, oldVoxel, newVoxel);
+        voxelChanges.Add(voxelChange);
+
+        WorldEditData worldEditData = new WorldEditData(editPosition, voxelChanges);
+
+        this.worldEditQueue.Enqueue(worldEditData);
+
+        return true;
+    }
+
+    public bool WorldEditSubstract(Vector3 worldPosition, int strength)
+    {
+        if (this.isWorldEditBlocked)
+            return false;
+
+        EditPosition editPosition = this.GetClosestEditPosition(worldPosition, true);
+
+        if (editPosition.index == -1)
+        {
+            Debug.Log("WorldEditDraw: Didn't find a close position.");
+            return false;
+        }
+
+        if (!this.chunks.ContainsKey(editPosition.chunkPosition))
+        {
+            return false;
+        }
+
+        // Voxel
+        List<VoxelChange> voxelChanges = new List<VoxelChange>();
+        Vector2Int chunkPosition = editPosition.chunkPosition;
+        Chunk chunk = this.chunks[chunkPosition];
+        int index = editPosition.index;
+
+        Voxel oldVoxel = chunk.GetVoxel(index);
+        int newDensity = (int)oldVoxel.GetDensity() + strength;
+        newDensity = math.clamp(newDensity, -128, -1);
+        Voxel newVoxel = new Voxel((sbyte)newDensity, oldVoxel.GetMaterial());
+        VoxelChange voxelChange = new VoxelChange(chunkPosition, index, oldVoxel, newVoxel);
+        voxelChanges.Add(voxelChange);
+
+        WorldEditData worldEditData = new WorldEditData(editPosition, voxelChanges);
+
+        this.worldEditQueue.Enqueue(worldEditData);
+
+        return true;
+    }
+
+    public bool WorldEditPaint(Vector3 worldPosition, byte material)
+    {
+        if (this.isWorldEditBlocked)
+            return false;
+
+        EditPosition editPosition = this.GetClosestEditPosition(worldPosition, true);
+
+        if (editPosition.index == -1)
+        {
+            Debug.Log("WorldEditDraw: Didn't find a close position.");
+            return false;
+        }
+
+        if (!this.chunks.ContainsKey(editPosition.chunkPosition))
+        {
+            return false;
+        }
+
+        // Voxel
+        List<VoxelChange> voxelChanges = new List<VoxelChange>();
+        Vector2Int chunkPosition = editPosition.chunkPosition;
+        Chunk chunk = this.chunks[chunkPosition];
+        int index = editPosition.index;
+
+        Voxel oldVoxel = chunk.GetVoxel(index);
+        Voxel newVoxel = new Voxel(oldVoxel.GetDensity(), material);
+        VoxelChange voxelChange = new VoxelChange(chunkPosition, index, oldVoxel, newVoxel);
+        voxelChanges.Add(voxelChange);
+
+        WorldEditData worldEditData = new WorldEditData(editPosition, voxelChanges);
+
+        this.worldEditQueue.Enqueue(worldEditData);
+
+        return true;
+    }
+
     //public bool WorldEditErase(Vector3 worldPosition)
     //{
     //    if (this.isWorldEditBlocked)
@@ -1699,10 +1811,10 @@ public class World : MonoBehaviour
                 {
                     EditPosition editPosition = this.WorldToEditPosition(worldPosition + new Vector3(x, y, z));
 
-                    int material = this.chunks[editPosition.chunkPosition].GetVoxel(editPosition.index).GetMaterial();
+                    Voxel voxel = this.chunks[editPosition.chunkPosition].GetVoxel(editPosition.index);
                     bool isValid = false;
-                    if (solid) isValid = (material > 0);
-                    if (!solid) isValid = (material == 0);
+                    if (solid) isValid = (voxel.IsSolid());
+                    if (!solid) isValid = (!voxel.IsSolid());
 
                     float distance = Vector3.Distance(worldPosition, editPosition.roundedPosition);
                     if (distance < minDistance && isValid)
@@ -1717,18 +1829,15 @@ public class World : MonoBehaviour
         return closestEditPosition;
     }
 
-        /*
     public float GetLightValue(Vector3 worldPosition)
     {
         EditPosition editPosition = this.GetClosestEditPosition(worldPosition, false);
 
-        if (this.chunks.ContainsKey(editPosition.chunkPosition))
+        if (this.chunks.ContainsKey(editPosition.chunkPosition) && editPosition.index != -1)
         {
             return (float)this.chunks[editPosition.chunkPosition].GetSunLight(editPosition.index) / 15.0f;
         }
 
         return 0.0f;
     }
-    */
-
 }
