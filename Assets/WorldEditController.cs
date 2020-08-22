@@ -28,6 +28,8 @@ namespace WorldEdit
 
 public class WorldEditController : MonoBehaviour
 {
+    public GameObject worldEditWindow;
+
     public bool isWorldEditEnabled = false;
 
     public World world;
@@ -55,6 +57,12 @@ public class WorldEditController : MonoBehaviour
         // Test Modes
         //
 
+        if (Input.GetKeyDown(KeyCode.Q))
+        {
+            this.EnableWindow();
+        }
+
+        /*
         if (Input.GetKeyDown(KeyCode.Q))
         {
             if (this.selectionMode == WorldEdit.SelectionMode.Raycast)
@@ -99,12 +107,13 @@ public class WorldEditController : MonoBehaviour
         {
             this.SetEditMode(WorldEdit.EditMode.Paint);
         }
+        */
 
         //
         // Return if world edit is disabled
         //
 
-        if (!this.isWorldEditEnabled)
+        if (!this.isWorldEditEnabled || Cursor.visible == true)
         {
             this.visualizer.SetActive(false);
             this.visualizerClosest.SetActive(false);
@@ -242,5 +251,52 @@ public class WorldEditController : MonoBehaviour
     public void SetApplyMode(WorldEdit.ApplyMode applyMode)
     {
         this.applyMode = applyMode;
+    }
+
+    //
+    // UI Window
+    //
+
+    public void EnableWindow()
+    {
+        this.worldEditWindow.SetActive(true);
+        Cursor.visible = true;
+        Cursor.lockState = CursorLockMode.Confined;
+    }
+
+    public void DisableWindow()
+    {
+        this.worldEditWindow.SetActive(false);
+        Cursor.visible = false;
+        Cursor.lockState = CursorLockMode.Locked;
+    }
+
+    // 
+    // Button Functions
+    //
+
+    public void SetEditModeDraw()
+    {
+        this.SetEditMode(WorldEdit.EditMode.Draw);
+    }
+
+    public void SetEditModeErase()
+    {
+        this.SetEditMode(WorldEdit.EditMode.Erase);
+    }
+
+    public void SetEditModeAdd()
+    {
+        this.SetEditMode(WorldEdit.EditMode.Add);
+    }
+
+    public void SetEditModeSubstract()
+    {
+        this.SetEditMode(WorldEdit.EditMode.Substract);
+    }
+
+    public void SetEditModePaint()
+    {
+        this.SetEditMode(WorldEdit.EditMode.Paint);
     }
 }

@@ -52,6 +52,12 @@ public class PlayerController : MonoBehaviour
 
     private void Update()
     {
+        if (Cursor.visible)
+        {
+            this.characterController.Move(this.velocity * Time.deltaTime);
+            return;
+        }
+
         this.ToggleCrouching();
         this.ToggleRunning();
         this.DetermineSpeed();
@@ -95,6 +101,16 @@ public class PlayerController : MonoBehaviour
         {
             this.lastJumpTimer = 0.0f;
             this.velocity.y = Mathf.Sqrt(this.jumpHeight * -2.0f * Physics.gravity.y);
+        }
+
+        if (this.characterController.isGrounded
+            && !Input.GetKey(KeyCode.W)
+            && !Input.GetKey(KeyCode.A)
+            && !Input.GetKey(KeyCode.S)
+            && !Input.GetKey(KeyCode.D))
+        {
+            this.velocity.x = 0.0f;
+            this.velocity.z = 0.0f;
         }
 
         this.characterController.Move(this.velocity * Time.deltaTime);
