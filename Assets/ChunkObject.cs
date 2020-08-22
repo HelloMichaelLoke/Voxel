@@ -92,8 +92,11 @@ public class ChunkObject
         this.colliderMeshes[index].SetVertices(vertices);
         this.colliderMeshes[index].SetIndices(indices, MeshTopology.Triangles, 0);
         this.colliderMeshes[index].Optimize();
-        this.colliderObjects[index].GetComponent<MeshCollider>().sharedMesh = this.colliderMeshes[index];
-        this.colliderObjects[index].SetActive(true);
+        if (this.colliderMeshes[index].vertexCount > 0)
+        {
+            this.colliderObjects[index].GetComponent<MeshCollider>().sharedMesh = this.colliderMeshes[index];
+            this.colliderObjects[index].SetActive(true);
+        }
     }
 
     public void Destroy()

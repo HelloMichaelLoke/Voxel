@@ -6,7 +6,7 @@ using Unity.Collections;
 using Unity.Jobs;
 using Unity.Mathematics;
 
-//[BurstCompile(CompileSynchronously = true)]
+[BurstCompile(CompileSynchronously = true)]
 public struct MeshTerrainJob : IJob
 {
     // Temporary Data
@@ -181,7 +181,7 @@ public struct MeshTerrainJob : IJob
             this.cornerIndices[i] = index;
             this.cornerVoxels[i] = this.voxelsMerged[index];
 
-            if (this.cornerVoxels[i].GetMaterial() > 0)
+            if (this.cornerVoxels[i].IsSolid())
             {
                 isEmpty = false;
             }
@@ -282,8 +282,8 @@ public struct MeshTerrainJob : IJob
             float3 position1 = this.cornerPositions[cornerIndex1];
             Voxel voxel0 = this.cornerVoxels[cornerIndex0];
             Voxel voxel1 = this.cornerVoxels[cornerIndex1];
-            bool solid0 = (this.cornerVoxels[cornerIndex0].GetMaterial() > 0);
-            bool solid1 = (this.cornerVoxels[cornerIndex1].GetMaterial() > 0);
+            bool solid0 = (this.cornerVoxels[cornerIndex0].IsSolid());
+            bool solid1 = (this.cornerVoxels[cornerIndex1].IsSolid());
             float sunLight0 = this.cornerLights[cornerIndex0].x;
             float sunLight1 = this.cornerLights[cornerIndex1].x;
             float sourceLight0 = this.cornerLights[cornerIndex0].y;
@@ -291,203 +291,48 @@ public struct MeshTerrainJob : IJob
             int index0 = this.cornerIndices[cornerIndex0];
             int index1 = this.cornerIndices[cornerIndex1];
 
-            float weight0 = 0.0f;
-            float weight1 = 0.0f;
+            //
+            // Weights
+            //
+
+            float density0 = (float)voxel0.GetDensity();
+            float density1 = (float)voxel1.GetDensity();
+            if (density0 >= 0.0f) density0 += 1.0f;
+            if (density1 >= 0.0f) density1 += 1.0f;
+            float distance = math.abs(density1) + math.abs(density0);
+            density0 /= distance;
+            density1 /= distance;
+
+            float weight0 = math.abs(density1);
+            float weight1 = 1.0f - weight0;
+
+            //
+            // Vertex, Normal, Material and Light
+            //
+
+            float3 vertex = weight0 * position0 + weight1 * position1;
+
+            Vector3 normal = weight0 * this.GetGradient(index0) + weight1 * this.GetGradient(index1);
+            if (normal != Vector3.zero) normal = math.normalize(normal);
+
             float materialId = 0.0f;
-
-            if (solid0)
-            {
-                materialId = voxel0.GetMaterial();
-
-                if (position0.x < position1.x) weight1 = voxel0.GetRight();
-                else if (position0.x > position1.x) weight1 = voxel0.GetLeft();
-                else if (position0.y < position1.y) weight1 = voxel0.GetTop();
-                else if (position0.y > position1.y) weight1 = voxel0.GetBottom();
-                else if (position0.z < position1.z) weight1 = voxel0.GetFront();
-                else if (position0.z > position1.z) weight1 = voxel0.GetBack();
-
-                weight0 = 1.0f - weight1;
-            }
-            else
-            {
-                materialId = voxel1.GetMaterial();
-
-                if (position0.x < position1.x) weight0 = voxel1.GetLeft();
-                else if (position0.x > position1.x) weight0 = voxel1.GetRight();
-                else if (position0.y < position1.y) weight0 = voxel1.GetBottom();
-                else if (position0.y > position1.y) weight0 = voxel1.GetTop();
-                else if (position0.z < position1.z) weight0 = voxel1.GetBack();
-                else if (position0.z > position1.z) weight0 = voxel1.GetFront();
-
-                weight1 = 1.0f - weight0;
-            }
-
-            float3 vertex;
-            vertex = weight0 * position0 + weight1 * position1;
-
             float sunLight = 0.0f;
-
-            if (solid0)
-            {
-                sunLight = sunLight1 - weight0;
-            }
-            else
-            {
-                sunLight = sunLight0 - weight1;
-            }
-
-            // TODO
             float sourceLight = 0.0f;
 
-            //
-            // Normal
-            //
-
-            float3 normal = new float3(0.0f, 0.0f, 0.0f);
-
-            float3 right = new float3(1.0f, 0.0f, 0.0f);
-            float3 left = new float3(-1.0f, 0.0f, 0.0f);
-            float3 top = new float3(0.0f, 1.0f, 0.0f);
-            float3 bottom = new float3(0.0f, -1.0f, 0.0f);
-            float3 front = new float3(0.0f, 0.0f, 1.0f);
-            float3 back = new float3(0.0f, 0.0f, -1.0f);
-
-            Voxel voxel0Right = this.voxelsMerged[index0 + 1];
-            Voxel voxel0Left = this.voxelsMerged[index0 - 1];
-            Voxel voxel0Top = this.voxelsMerged[index0 + 361];
-            Voxel voxel0Bottom = this.voxelsMerged[index0 - 361];
-            Voxel voxel0Front = this.voxelsMerged[index0 + 19];
-            Voxel voxel0Back = this.voxelsMerged[index0 - 19];
-
-            Voxel voxel0LeftTop = this.voxelsMerged[index0 - 1 + 361];
-            Voxel voxel0RightTop = this.voxelsMerged[index0 + 1 + 361];
-            Voxel voxel0FrontTop = this.voxelsMerged[index0 + 19 + 361];
-            Voxel voxel0BackTop = this.voxelsMerged[index0 - 19 + 361];
-            Voxel voxel0LeftBottom = this.voxelsMerged[index0 - 1 - 361];
-            Voxel voxel0RightBottom = this.voxelsMerged[index0 + 1 - 361];
-            Voxel voxel0FrontBottom = this.voxelsMerged[index0 + 19 - 361];
-            Voxel voxel0BackBottom = this.voxelsMerged[index0 - 19 - 361];
-
-            Voxel voxel1Right = this.voxelsMerged[index1 + 1];
-            Voxel voxel1Left = this.voxelsMerged[index1 - 1];
-            Voxel voxel1Top = this.voxelsMerged[index1 + 361];
-            Voxel voxel1Bottom = this.voxelsMerged[index1 - 361];
-            Voxel voxel1Front = this.voxelsMerged[index1 + 19];
-            Voxel voxel1Back = this.voxelsMerged[index1 - 19];
-
-            bool isTowardsRight = (position0.x != position1.x);
-            bool isTowardsTop = (position0.y != position1.y);
-            bool isTowardsFront = (position0.z != position1.z);
-
-            if (isTowardsTop)
+            if (solid0)
             {
-                if (voxel0.IsSolid())
-                {
-                    // Right
-                    if (voxel0Right.IsSolid())
-                    {
-                        if (!voxel0RightTop.IsSolid())
-                            normal += math.normalize(top + (voxel0.GetTop() - voxel0Right.GetTop()) * right);
-                        else
-                            normal += math.normalize(voxel0RightTop.GetLeft() * left + voxel0.GetTop() * top);
-                    }
-                    else
-                    {
-                        normal += math.normalize(voxel0.GetRight() * top + voxel0.GetTop() * right);
-                    }
-
-                    // Left
-                    if (voxel0Left.IsSolid())
-                    {
-                        if (!voxel0LeftTop.IsSolid())
-                            normal += math.normalize(top + (voxel0.GetTop() - voxel0Left.GetTop()) * left);
-                        else
-                            normal += math.normalize(voxel0LeftTop.GetRight() * right + voxel0.GetTop() * top);
-                    }
-                    else
-                    {
-                        normal += math.normalize(voxel0.GetLeft() * top + voxel0.GetTop() * left);
-                    }
-
-                    // Front
-                    if (voxel0Front.IsSolid())
-                    {
-                        if (!voxel0FrontTop.IsSolid())
-                            normal += math.normalize(top + (voxel0.GetTop() - voxel0Front.GetTop()) * front);
-                        else
-                            normal += math.normalize(voxel0FrontTop.GetBack() * back + voxel0.GetTop() * top);
-                    }
-                    else
-                    {
-                        normal += math.normalize(voxel0.GetFront() * top + voxel0.GetTop() * front);
-                    }
-
-                    // Back
-                    if (voxel0Back.IsSolid())
-                    {
-                        if (!voxel0BackTop.IsSolid())
-                            normal += math.normalize(top + (voxel0.GetTop() - voxel0Back.GetTop()) * back);
-                        else
-                            normal += math.normalize(voxel0BackTop.GetFront() * front + voxel0.GetTop() * top);
-                    }
-                    else
-                    {
-                        normal += math.normalize(voxel0.GetBack() * top + voxel0.GetTop() * back);
-                    }
-                }
-                
-                //if (voxel1.IsSolid())
-                //{
-                //    // Bottom Right | Not Solid
-                //    if (!voxel1Right.IsSolid()) normal += math.normalize(voxel1.GetRight() * bottom + voxel1.GetBottom() * right);
-                //    // Bottom Left | Not Solid
-                //    if (!voxel1Left.IsSolid()) normal += math.normalize(voxel1.GetLeft() * bottom + voxel1.GetBottom() * left);
-                //    // Bottom Front | Not Solid
-                //    if (!voxel1Front.IsSolid()) normal += math.normalize(voxel1.GetFront() * bottom + voxel1.GetBottom() * front);
-                //    // Bottom Back | Not Solid
-                //    if (!voxel1Back.IsSolid()) normal += math.normalize(voxel1.GetBack() * bottom + voxel1.GetBottom() * back);
-                //}
+                materialId = this.GetMaterial(index0);
+            }
+            else
+            {
+                materialId = this.GetMaterial(index1);
             }
 
-            //if (voxel0.IsSolid())
-            //{
-            //    if (isTowardsTop)
-            //    {
-            //        if (!voxel0Right.IsSolid() && !voxel0Left.IsSolid())
-            //        {
-            //            float3 directionRight = voxel0.GetRight() * top + voxel0.GetTop() * right;
-            //            float3 directionLeft = voxel0.GetLeft() * top + voxel0.GetTop() * left;
-            //            normal += directionRight + directionLeft;
-            //        }
+            //if (solid0 && this.lightsMerged[index1] == 0) { sunLight0 = 0.0f; sunLight1 = 0.0f; };
+            //if (solid1 && this.lightsMerged[index0] == 0) { sunLight0 = 0.0f; sunLight1 = 0.0f; };
 
-            //        if (!voxel0Front.IsSolid() && !voxel0Back.IsSolid())
-            //        {
-            //            float3 directionFront = voxel0.GetFront() * top + voxel0.GetTop() * front;
-            //            float3 directionBack = voxel0.GetBack() * top + voxel0.GetTop() * back;
-            //            normal += directionFront + directionBack;
-            //        }
-            //    }
-
-            //    if (isTowardsRight)
-            //    {
-            //        if (!voxel0Top.IsSolid() && !voxel0Bottom.IsSolid())
-            //        {
-            //            float3 directionTop = voxel0.GetTop() * right + voxel0.GetRight() * top;
-            //            float3 directionBottom = voxel0.GetBottom() * right + voxel0.GetRight() * bottom;
-            //            normal += directionTop + directionBottom;
-            //        }
-            //    }
-
-            //    if (isTowardsFront)
-            //    {
-            //        if (!voxel0Top.IsSolid() && !voxel0Bottom.IsSolid())
-            //        {
-            //            float3 directionTop = voxel0.GetTop() * front + voxel0.GetFront() * top;
-            //            float3 directionBottom = voxel0.GetBottom() * back + voxel0.GetBack() * bottom;
-            //            normal += directionTop + directionBottom;
-            //        }
-            //    }
-            //}
+            sunLight = weight0 * sunLight0 + weight1 * sunLight1;
+            sourceLight = weight0 * sourceLight0 + weight1 * sourceLight1;
 
             //
             // Set Mesh Data
@@ -495,7 +340,7 @@ public struct MeshTerrainJob : IJob
 
             this.lights.Add(new float2(sunLight / 15.0f, sourceLight / 15.0f));
             this.vertices.Add(vertex - new float3(1.0f, 0.0f, 1.0f));
-            this.normals.Add(math.normalize(normal));
+            this.normals.Add(normal);
             this.mats1234.Add(matIds1234);
             this.mats5678.Add(matIds5678);
 
@@ -526,12 +371,105 @@ public struct MeshTerrainJob : IJob
 
     private float2 GetLight(int index)
     {
-        float sunLight = 0.0f;
-        sunLight = (float)((this.lightsMerged[index] >> 4) & 0xF);
+        float sunLight = sunLight = (float)((this.lightsMerged[index] >> 4) & 0xF);
 
-        float sourceLight = 0.0f;
-        sourceLight = (float)(this.lightsMerged[index] & 0xF);
+        for (int x = -1; x <= 1; x++)
+        {
+            for (int y = -1; y <= 1; y++)
+            {
+                for (int z = -1; z <= 1; z++)
+                {
+                    sunLight = math.max(sunLight, (float)((this.lightsMerged[index + x + (y * 361) + (z * 19)] >> 4) & 0xF));
+                }
+            }
+        }
+
+        //sunLight = math.max(sunLight, (float)((this.lightsMerged[index] >> 4) & 0xF));
+        //sunLight = math.max(sunLight, (float)((this.lightsMerged[index + 1] >> 4) & 0xF));
+        //sunLight = math.max(sunLight, (float)((this.lightsMerged[index - 1] >> 4) & 0xF));
+        //sunLight = math.max(sunLight, (float)((this.lightsMerged[index + 361] >> 4) & 0xF));
+        //sunLight = math.max(sunLight, (float)((this.lightsMerged[index - 361] >> 4) & 0xF));
+        //sunLight = math.max(sunLight, (float)((this.lightsMerged[index + 19] >> 4) & 0xF));
+        //sunLight = math.max(sunLight, (float)((this.lightsMerged[index - 19] >> 4) & 0xF));
+
+        // TODO Get Max
+        float sourceLight = sourceLight = (float)(this.lightsMerged[index] & 0xF);
 
         return new float2(sunLight, sourceLight);
+    }
+
+    private Voxel GetVoxel(int index)
+    {
+        return this.voxelsMerged[index];
+    }
+
+    private Vector3 GetGradient(int index)
+    {
+        Vector3 gradient = Vector3.zero;
+
+        gradient += this.GetVoxel(index + 1).GetDensity() * new Vector3(1.0f, 0.0f, 0.0f);
+        gradient += this.GetVoxel(index - 1).GetDensity() * new Vector3(-1.0f, 0.0f, 0.0f);
+        gradient += this.GetVoxel(index + 361).GetDensity() * new Vector3(0.0f, 1.0f, 0.0f);
+        gradient += this.GetVoxel(index - 361).GetDensity() * new Vector3(0.0f, -1.0f, 0.0f);
+        gradient += this.GetVoxel(index + 19).GetDensity() * new Vector3(0.0f, 0.0f, 1.0f);
+        gradient += this.GetVoxel(index - 19).GetDensity() * new Vector3(0.0f, 0.0f, -1.0f);
+
+        gradient = math.normalize(gradient);
+
+        return gradient;
+    }
+
+    private byte GetMaterial(int index)
+    {
+        return this.GetVoxel(index).GetMaterial();
+
+        byte material = 0;
+
+        sbyte minDensity = 127;
+
+        Voxel voxelRight = this.GetVoxel(index + 1);
+        Voxel voxelLeft = this.GetVoxel(index - 1);
+        Voxel voxelTop = this.GetVoxel(index + 361);
+        Voxel voxelBottom = this.GetVoxel(index - 361);
+        Voxel voxelFront = this.GetVoxel(index + 19);
+        Voxel voxelBack = this.GetVoxel(index - 19);
+
+        if (voxelRight.GetDensity() < minDensity)
+        {
+            material = voxelRight.GetMaterial();
+            minDensity = voxelRight.GetDensity();
+        }
+
+        if (voxelLeft.GetDensity() < minDensity)
+        {
+            material = voxelLeft.GetMaterial();
+            minDensity = voxelLeft.GetDensity();
+        }
+
+        if (voxelTop.GetDensity() < minDensity)
+        {
+            material = voxelTop.GetMaterial();
+            minDensity = voxelTop.GetDensity();
+        }
+
+        if (voxelBottom.GetDensity() < minDensity)
+        {
+            material = voxelBottom.GetMaterial();
+            minDensity = voxelBottom.GetDensity();
+        }
+
+        if (voxelFront.GetDensity() < minDensity)
+        {
+            material = voxelFront.GetMaterial();
+            minDensity = voxelFront.GetDensity();
+        }
+
+        if (voxelBack.GetDensity() < minDensity)
+        {
+            material = voxelBack.GetMaterial();
+            minDensity = voxelBack.GetDensity();
+        }
+
+        return material;
     }
 }

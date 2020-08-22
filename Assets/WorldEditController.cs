@@ -4,19 +4,25 @@ using UnityEngine;
 
 public class WorldEditController : MonoBehaviour
 {
+    public bool isWorldEditEnabled = false;
+
     public World world;
     public Camera mainCamera;
     public GameObject visualizer;
     public GameObject visualizerClosest;
-    public LineRenderer line;
 
-    void Start()
+    public void Start()
     {
         
     }
 
-    void Update()
+    public void Update()
     {
+        if (!this.isWorldEditEnabled)
+        {
+            return;
+        }
+
         /*
         Vector3 editPosition = this.mainCamera.transform.position + this.mainCamera.transform.forward * 3.0f;
 
@@ -51,6 +57,8 @@ public class WorldEditController : MonoBehaviour
         }
         */
 
+
+
         RaycastHit hit;
         Ray ray = this.mainCamera.ScreenPointToRay(Input.mousePosition);
         int layerMask = 1 << 8;
@@ -66,11 +74,11 @@ public class WorldEditController : MonoBehaviour
 
                 if (Vector3.Distance(hit.point, this.transform.position) >= 1.0f)
                 {
-                    if (Input.GetMouseButton(0))
+                    if (Input.GetMouseButtonDown(0))
                     {
                         this.world.WorldEditDraw(hit.point, (byte)3);
                     }
-                    else if (Input.GetMouseButton(1))
+                    else if (Input.GetMouseButtonDown(1))
                     {
                         this.world.WorldEditErase(hit.point);
                     }

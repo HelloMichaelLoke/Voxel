@@ -47,94 +47,77 @@ public struct GenerateTerrainJob : IJob
             {
                 for (int x = startPosition.x; x <= endPosition.x; x++)
                 {
-                    Voxel voxel = new Voxel();
                     float height = heights[heightIndex];
+                    float density = 0.0f;
+                    byte material = 0;
+                    float3 position = new float3(x, y, z);
 
-                    if (y <= height - 3.0f)
+                    /*
+                    if (y < height)
                     {
-                        float caveNoiseCenter = this.GetCaves(new float3(x, y, z));
-
-                        if (caveNoiseCenter < 0.0f)
+                        if (y + 1 < height)
                         {
-                            float caveNoiseRight = this.GetCaves(new float3(x + 1, y, z));
-                            float caveNoiseLeft = this.GetCaves(new float3(x - 1, y, z));
-                            float caveNoiseTop = this.GetCaves(new float3(x, y + 1, z));
-                            float caveNoiseBottom = this.GetCaves(new float3(x, y - 1, z));
-                            float caveNoiseFront = this.GetCaves(new float3(x, y, z + 1));
-                            float caveNoiseBack = this.GetCaves(new float3(x, y, z - 1));
-
-                            voxel.SetVoxel(255, 255, 255, 255, 255, 255, this.GetMaterial(new float3(x, y, z)));
-
-                            if (y + 1 >= height)
-                            {
-                                if (caveNoiseTop >= 0.0f)
-                                {
-                                    float distance = math.abs(caveNoiseCenter - caveNoiseTop);
-                                    voxel.SetTop((-caveNoiseCenter) / distance);
-                                }
-                                else
-                                {
-                                    float distance = math.abs(y - height);
-                                    voxel.SetLeft(distance);
-                                    voxel.SetRight(distance);
-                                    voxel.SetTop(distance);
-                                    voxel.SetBottom(distance);
-                                    voxel.SetFront(distance);
-                                    voxel.SetBack(distance);
-                                }
-                            }
-                            else
-                            {
-                                if (caveNoiseRight >= 0.0f)
-                                {
-                                    float distance = math.abs(caveNoiseCenter - caveNoiseRight);
-                                    voxel.SetRight((-caveNoiseCenter) / distance);
-                                }
-                                if (caveNoiseLeft >= 0.0f)
-                                {
-                                    float distance = math.abs(caveNoiseCenter - caveNoiseLeft);
-                                    voxel.SetLeft((-caveNoiseCenter) / distance);
-                                }
-                                if (caveNoiseTop >= 0.0f)
-                                {
-                                    float distance = math.abs(caveNoiseCenter - caveNoiseTop);
-                                    voxel.SetTop((-caveNoiseCenter) / distance);
-                                }
-                                if (caveNoiseBottom >= 0.0f)
-                                {
-                                    float distance = math.abs(caveNoiseCenter - caveNoiseBottom);
-                                    voxel.SetBottom((-caveNoiseCenter) / distance);
-                                }
-                                if (caveNoiseFront >= 0.0f)
-                                {
-                                    float distance = math.abs(caveNoiseCenter - caveNoiseFront);
-                                    voxel.SetFront((-caveNoiseCenter) / distance);
-                                }
-                                if (caveNoiseBack >= 0.0f)
-                                {
-                                    float distance = math.abs(caveNoiseCenter - caveNoiseBack);
-                                    voxel.SetBack((-caveNoiseCenter) / distance);
-                                }
-                            }
+                            density = -128.0f;
                         }
-                    }
+                        else
+                        {
+                            float distanceToSurface = height % 1.0f;
+                            density = -127.0f * distanceToSurface - 1.0f;
+                        }
 
-                    if (y < height && y > height - 3.0f)
+                        material = this.GetMaterial(position);
+                    }
+                    else if (y > height)
                     {
-                        voxel.SetMaterial(this.GetMaterial(new float3(x, y, z)));
-                        voxel.SetTop(height - y);
-                        voxel.SetRight((1.0f / (height - this.GetHeightA(new float2(x + 1.0f, z)))) * (height - y));
-                        voxel.SetLeft((1.0f / (height - this.GetHeightA(new float2(x - 1.0f, z)))) * (height - y));
-                        voxel.SetFront((1.0f / (height - this.GetHeightA(new float2(x, z + 1.0f)))) * (height - y));
-                        voxel.SetBack((1.0f / (height - this.GetHeightA(new float2(x, z - 1.0f)))) * (height - y));
+                        if (y - 1 < height)
+                        {
+                            float distanceToSurface = height % 1.0f;
+                            density = -127.0f * distanceToSurface - 1.0f;
+                            density += 128.0f;
+                        }
+                        else
+                        {
+                            density = 127.0f;
+                        }
+                        material = 0;
+                    }
+                    */
+
+                    if (y >= 80)
+                    {
+                        density = 127;
+                        material = 0;
+                    }
+                    else
+                    {
+                        float caveNoise = GetCaves(new float3(x, y, z));
+
+                        if (caveNoise < 0.0f)
+                        {
+                            density = (sbyte)math.round(127.0f * caveNoise);
+                            density -= 1;
+                            material = this.GetMaterial(position);
+                        }
+                        else
+                        {
+                            density = (sbyte)math.round(127.0f * caveNoise);
+                            material = 0;
+                        }
                     }
 
                     if (y <= 2)
                     {
-                        voxel.SetVoxel(255, 255, 255, 255, 255, 255, 1);
+                        density = -128.0f;
+                        material = 1;
                     }
 
-                    this.voxels[i] = voxel;
+                    if (y >= 254)
+                    {
+                        density = 127.0f;
+                        material = 0;
+                    }
+
+                    this.voxels[i] = new Voxel((sbyte)density, material);
 
                     i++;
                     heightIndex++;

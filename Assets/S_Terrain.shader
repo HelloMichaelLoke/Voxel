@@ -267,9 +267,17 @@
                         light = lerpValue * light + (1.0 - lerpValue) * lightThreshold;
                     }
 
+                    // Gamma Correction
                     //light = pow(light, 1.0 / 2.2);
-                    float3 color = i.diff;
-                    //float3 color = (_TexBrightness + (1.0 - _TexBrightness) * light)* albedo;
+
+                    // Diffuse Light
+                    //float3 color = i.diff;
+                    
+                    // Voxel Light
+                    float3 color = max(i.light.x, i.light.y) * float3(1.0, 1.0, 1.0);
+
+                    // Albedo with Light
+                    //float3 color = (_TexBrightness + (1.0 - _TexBrightness) * light) * albedo;
 
                     //color = i.worldNormal;
                     //color = float3(1.0, 1.0, 1.0) * light;

@@ -51,35 +51,20 @@ public struct WorldEditData
 
 public struct Voxel
 {
-    private byte right;  // +X
-    private byte left;   // -X
-    private byte top;    // +Y
-    private byte bottom; // -Y
-    private byte front;  // +Z
-    private byte back;   // -Z
+    private sbyte density;
     private byte material;
 
-    public Voxel(byte right, byte left, byte top, byte bottom, byte front, byte back, byte material)
+    public Voxel(sbyte density, byte material)
     {
-        this.right = right;
-        this.left = left;
-        this.top = top;
-        this.bottom = bottom;
-        this.front = front;
-        this.back = back;
+        this.density = density;
         this.material = material;
     }
 
     // Set Voxel
 
-    public void SetVoxel(byte right, byte left, byte top, byte bottom, byte front, byte back, byte material)
+    public void SetVoxel(sbyte density, byte material)
     {
-        this.right = right;
-        this.left = left;
-        this.top = top;
-        this.bottom = bottom;
-        this.front = front;
-        this.back = back;
+        this.density = density;
         this.material = material;
     }
 
@@ -98,71 +83,17 @@ public struct Voxel
     }
 
     //
-    // Set Directions
+    // Set & Get Density
     //
 
-    public void SetRight(float right)
+    public void SetDensity(sbyte density)
     {
-        this.right = (byte)(math.clamp(right, 0.0f, 1.0f) * 255.0f);
+        this.density = density;
     }
 
-    public void SetLeft(float left)
+    public sbyte GetDensity()
     {
-        this.left = (byte)(math.clamp(left, 0.0f, 1.0f) * 255.0f);
-    }
-
-    public void SetTop(float top)
-    {
-        this.top = (byte)(math.clamp(top, 0.0f, 1.0f) * 255.0f);
-    }
-
-    public void SetBottom(float bottom)
-    {
-        this.bottom = (byte)(math.clamp(bottom, 0.0f, 1.0f) * 255.0f);
-    }
-
-    public void SetFront(float front)
-    {
-        this.front = (byte)(math.clamp(front, 0.0f, 1.0f) * 255.0f);
-    }
-
-    public void SetBack(float back)
-    {
-        this.back = (byte)(math.clamp(back, 0.0f, 1.0f) * 255.0f);
-    }
-
-    //
-    // Get Directions
-    //
-
-    public float GetRight()
-    {
-        return (float)right / 255.0f;
-    }
-
-    public float GetLeft()
-    {
-        return (float)left / 255.0f;
-    }
-
-    public float GetTop()
-    {
-        return (float)top / 255.0f;
-    }
-
-    public float GetBottom()
-    {
-        return (float)bottom / 255.0f;
-    }
-
-    public float GetFront()
-    {
-        return (float)front / 255.0f;
-    }
-
-    public float GetBack()
-    {
-        return (float)back / 255.0f;
+        return this.density;
     }
 
     //
@@ -171,20 +102,6 @@ public struct Voxel
 
     public bool IsSolid()
     {
-        return (this.GetMaterial() > 0);
-    }
-
-    public bool IsDensityEqualTo(Voxel otherVoxel)
-    {
-        bool isEqual = true;
-
-        if (otherVoxel.GetRight() != this.GetRight()) isEqual = false;
-        if (otherVoxel.GetLeft() != this.GetLeft()) isEqual = false;
-        if (otherVoxel.GetTop() != this.GetTop()) isEqual = false;
-        if (otherVoxel.GetBottom() != this.GetBottom()) isEqual = false;
-        if (otherVoxel.GetFront() != this.GetFront()) isEqual = false;
-        if (otherVoxel.GetBack() != this.GetBack()) isEqual = false;
-
-        return isEqual;
+        return (this.density < 0);
     }
 }
