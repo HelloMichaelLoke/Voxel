@@ -51,44 +51,11 @@ public struct GenerateTerrainJob : IJob
                     float density = 0.0f;
                     byte material = 0;
                     float3 position = new float3(x, y, z);
+                    float2 positionXZ = new float2(x, z);
+                    float temperature = this.GetTemperature(positionXZ);
+                    float rainfall = this.GetRainfall(positionXZ);
 
-                    /*
-                    if (y < height)
-                    {
-                        if (y + 1 < height)
-                        {
-                            density = -128.0f;
-                        }
-                        else
-                        {
-                            float distanceToSurface = height % 1.0f;
-                            density = -127.0f * distanceToSurface - 1.0f;
-                        }
-
-                        material = this.GetMaterial(position);
-                    }
-                    else if (y > height)
-                    {
-                        if (y - 1 < height)
-                        {
-                            float distanceToSurface = height % 1.0f;
-                            density = -127.0f * distanceToSurface - 1.0f;
-                            density += 128.0f;
-                        }
-                        else
-                        {
-                            density = 127.0f;
-                        }
-                        material = 0;
-                    }
-                    */
-
-                    if (y >= height)
-                    {
-                        density = 127;
-                        material = 0;
-                    }
-                    else
+                    if (y < 75.0f || y < height - 10.0f)
                     {
                         float caveNoise = GetCaves(new float3(x, y, z));
 
@@ -96,7 +63,7 @@ public struct GenerateTerrainJob : IJob
                         {
                             density = (sbyte)math.round(127.0f * caveNoise);
                             density -= 1;
-                            material = this.GetMaterial(position);
+                            material = 4;
                         }
                         else
                         {
@@ -104,11 +71,133 @@ public struct GenerateTerrainJob : IJob
                             material = 0;
                         }
                     }
+                    else
+                    {
+                        if (y > height + 1.0f)
+                        {
+                            density = 127.0f;
+                            material = 0;
+                        }
+                        else
+                        {
+                            density = -128.0f;
+
+                            float desert = temperature + (1.0f - rainfall);
+                            float snow = (1.0f - temperature) + rainfall;
+                            float grass = temperature + rainfall;
+                            float dirt = (1.0f - temperature) + (1.0f - rainfall);
+
+                            float maxBiome1 = 0.0f;
+                            float maxBiome2 = 0.0f;
+                            int biome1 = 0;
+                            int biome2 = 0;
+                            
+                            if (desert > maxBiome1)
+                            {
+                                maxBiome1 = desert;
+                                biome1 = 1;
+                            }
+
+                            if (snow > maxBiome1)
+                            {
+                                maxBiome1 = snow;
+                                biome1 = 2;
+                            }
+                            else if (snow > maxBiome2)
+                            {
+                                maxBiome2 = snow;
+                                biome2 = 2;
+                            }
+
+                            if (grass > maxBiome1)
+                            {
+                                maxBiome1 = grass;
+                                biome1 = 3;
+                            }
+                            else if (grass > maxBiome2)
+                            {
+                                maxBiome2 = grass;
+                                biome2 = 3;
+                            }
+
+                            if (dirt > maxBiome1)
+                            {
+                                maxBiome1 = dirt;
+                                biome1 = 4;
+                            }
+                            else if (dirt > maxBiome2)
+                            {
+                                maxBiome2 = dirt;
+                                biome2 = 4;
+                            }
+
+                            if (biome1 == 1)
+                            {
+                                material = 2;
+                            }
+                            else if (biome1 == 2)
+                            {
+                                material = 5;
+                            }
+                            else if (biome1 == 3)
+                            {
+                                material = 3;
+                            }
+                            else if (biome1 == 4)
+                            {
+                                material = 1;
+                            }
+
+                            float distance = math.distance(maxBiome1, maxBiome2);
+                            if (distance < 0.1f)
+                            {
+                                float chance = noise.snoise(positionXZ);
+                                if (chance > 0.0f + (distance / 0.1f))
+                                {
+                                    if (biome2 == 1)
+                                    {
+                                        material = 2;
+                                    }
+                                    else if (biome2 == 2)
+                                    {
+                                        material = 5;
+                                    }
+                                    else if (biome2 == 3)
+                                    {
+                                        material = 3;
+                                    }
+                                    else if (biome2 == 4)
+                                    {
+                                        material = 1;
+                                    }
+                                }
+                            }
+
+                            if (height < 120.0f)
+                            {
+                                material = 4;
+                            }
+                        }
+                    }
+
+                    if (y < height && y + 1 >= height && density < 0)
+                    {
+                        float distanceToSurface = height % 1.0f;
+                        density = -127.0f * distanceToSurface - 1.0f;
+                    }
+                    else if (y >= height && y - 1 < height)
+                    {
+                        float distanceToSurface = height % 1.0f;
+                        density = -127.0f * distanceToSurface - 1.0f;
+                        density += 128.0f;
+                        material = 0;
+                    }
+
 
                     if (y <= 2)
                     {
                         density = -128.0f;
-                        material = 1;
+                        material = 4;
                     }
 
                     if (y >= 254)
@@ -173,19 +262,56 @@ public struct GenerateTerrainJob : IJob
         return value;
     }
 
+    /// <summary>
+    /// Returns a rainfall value between 0.0f and 1.0f
+    /// </summary>
+    /// <param name="position">The x,z position to generate.</param>
+    /// <returns>Returns a rainfall value between 0.0f and 1.0f</returns>
+    private float GetRainfall(float2 position)
+    {
+        float rainfall = 0.0f;
+
+        float2 offset = new float2(1000.0f, 1000.0f);
+
+        rainfall = noise.snoise(offset + (position * 0.001f));
+
+        rainfall = 0.5f * rainfall + 0.5f;
+
+        return rainfall;
+    }
+
+    /// <summary>
+    /// Returns a temperature value between 0.0f and 1.0f
+    /// </summary>
+    /// <param name="position">The x,z position to generate.</param>
+    /// <returns></returns>
+    private float GetTemperature(float2 position)
+    {
+        float temperature = 0.0f;
+
+        float2 offset = new float2(-1000.0f, -1000.0f);
+
+        temperature = noise.snoise(offset + (position * 0.001f));
+
+        temperature = 0.5f * temperature + 0.5f;
+
+        return temperature;
+    }
+
     private float GetHeightA(float2 position)
     {
-        float2 pos = new float2(position.x, position.y - 10.0f) * 0.0003f;
+        float2 pos = new float2(position.x + 15000.0f, position.y - 20000.0f) * 0.0010f;
 
         float2 q = new float2(noise.snoise(pos), noise.snoise(pos + new float2(-12.700f, 11.820f)));
         float2 r = pos + 4.0f * q;
         float2 s = new float2(noise.snoise(r + new float2(5.060f, -8.830f)), noise.snoise(r + new float2(-0.270f, -0.180f)));
         float2 t = pos + 4.0f * s;
 
-        float val = octaves(pos, 24.0f);
-        float val2 = octaves(pos * 10.0f, 16.0f);
+        float val = octaves(pos, 16.0f);
+        float val2 = octaves(pos * 10.0f, 8.0f);
         val = 0.8f * val + 0.05f * noise.snoise(t * 0.05f) + 0.15f * val2;
 
+        /*
         float2 seaLevelPos = pos * 0.006f + t * 0.005f;
         float seaLevel = noise.snoise(seaLevelPos);
 
@@ -197,12 +323,14 @@ public struct GenerateTerrainJob : IJob
         {
             val = math.lerp(val, 0.0f, math.smoothstep(seaLevel, -1.0f, val));
         }
+        */
 
-        val = (val + 1.0f) / 2.0f;
+        float2 offset = new float2(13000.0f, 5000.0f);
+        float amplitude = (1.0f + noise.snoise(offset + pos * 0.001f)) / 2.0f;
 
-        float amplitude = (1.0f + noise.snoise(pos * 0.0015f)) / 2.0f;
+        val = 0.95f * val + 0.05f * octaves(pos * 0.04f, 2.0f);
 
-        return amplitude * val * 220.0f;
+        return 120.0f + amplitude * val * 70.0f;
     }
 
     public float octaves(float2 pos, float octaves)

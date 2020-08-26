@@ -202,6 +202,7 @@ public struct MeshTerrainJob : IJob
             this.cornerLights[i] = this.GetLight(index);
         }
 
+        // Set the cell's material id's for the shader
         float matId1 = (float)this.cornerVoxels[0].GetMaterial();
         float matId2 = (float)this.cornerVoxels[1].GetMaterial();
         float matId3 = (float)this.cornerVoxels[2].GetMaterial();
@@ -210,45 +211,21 @@ public struct MeshTerrainJob : IJob
         float matId6 = (float)this.cornerVoxels[5].GetMaterial();
         float matId7 = (float)this.cornerVoxels[6].GetMaterial();
         float matId8 = (float)this.cornerVoxels[7].GetMaterial();
-
         float4 matIds1234 = new float4(matId1 - 1.0f, matId2 - 1.0f, matId3 - 1.0f, matId4 - 1.0f);
         float4 matIds5678 = new float4(matId5 - 1.0f, matId6 - 1.0f, matId7 - 1.0f, matId8 - 1.0f);
 
+        // Determine the marching cubes case
         byte caseIndex = 0;
+        if (this.cornerVoxels[0].IsSolid()) caseIndex |= 0b_0000_0001;
+        if (this.cornerVoxels[1].IsSolid()) caseIndex |= 0b_0000_0010;
+        if (this.cornerVoxels[2].IsSolid()) caseIndex |= 0b_0000_0100;
+        if (this.cornerVoxels[3].IsSolid()) caseIndex |= 0b_0000_1000;
+        if (this.cornerVoxels[4].IsSolid()) caseIndex |= 0b_0001_0000;
+        if (this.cornerVoxels[5].IsSolid()) caseIndex |= 0b_0010_0000;
+        if (this.cornerVoxels[6].IsSolid()) caseIndex |= 0b_0100_0000;
+        if (this.cornerVoxels[7].IsSolid()) caseIndex |= 0b_1000_0000;
 
-        if (matId1 > 0)
-        {
-            caseIndex |= 0b_0000_0001;
-        }
-        if (matId2 > 0)
-        {
-            caseIndex |= 0b_0000_0010;
-        }
-        if (matId3 > 0)
-        {
-            caseIndex |= 0b_0000_0100;
-        }
-        if (matId4 > 0)
-        {
-            caseIndex |= 0b_0000_1000;
-        }
-        if (matId5 > 0)
-        {
-            caseIndex |= 0b_0001_0000;
-        }
-        if (matId6 > 0)
-        {
-            caseIndex |= 0b_0010_0000;
-        }
-        if (matId7 > 0)
-        {
-            caseIndex |= 0b_0100_0000;
-        }
-        if (matId8 > 0)
-        {
-            caseIndex |= 0b_1000_0000;
-        }
-
+        // Set vertex count and triangle count
         byte cellClass = mcCellClasses[caseIndex];
         int geometryCounts = mcCellGeometryCounts[cellClass];
         int vertexCount = geometryCounts >> 4;
@@ -313,6 +290,7 @@ public struct MeshTerrainJob : IJob
             float3 vertex = weight0 * position0 + weight1 * position1;
 
             Vector3 normal = weight0 * this.GetGradient(index0) + weight1 * this.GetGradient(index1);
+
             if (normal != Vector3.zero) normal = math.normalize(normal);
 
             float materialId = 0.0f;
@@ -407,14 +385,30 @@ public struct MeshTerrainJob : IJob
     {
         Vector3 gradient = Vector3.zero;
 
-        gradient += this.GetVoxel(index + 1).GetDensity() * new Vector3(1.0f, 0.0f, 0.0f);
-        gradient += this.GetVoxel(index - 1).GetDensity() * new Vector3(-1.0f, 0.0f, 0.0f);
-        gradient += this.GetVoxel(index + 361).GetDensity() * new Vector3(0.0f, 1.0f, 0.0f);
-        gradient += this.GetVoxel(index - 361).GetDensity() * new Vector3(0.0f, -1.0f, 0.0f);
-        gradient += this.GetVoxel(index + 19).GetDensity() * new Vector3(0.0f, 0.0f, 1.0f);
-        gradient += this.GetVoxel(index - 19).GetDensity() * new Vector3(0.0f, 0.0f, -1.0f);
+        int offset = 0;
+        for (int z = -1; z <= 1; z++)
+        {
+            for (int y = -1; y <= 1; y++)
+            {
+                for (int x = -1; x <= 1; x++)
+                {
+                    offset = x + y * 361 + z * 19;
+                    gradient += this.GetVoxel(index + offset).GetDensity() * new Vector3(x, y, z);
+                }
+            }
+        }
 
-        gradient = math.normalize(gradient);
+        //gradient += this.GetVoxel(index + 1).GetDensity() * new Vector3(1.0f, 0.0f, 0.0f);
+        //gradient += this.GetVoxel(index - 1).GetDensity() * new Vector3(-1.0f, 0.0f, 0.0f);
+        //gradient += this.GetVoxel(index + 361).GetDensity() * new Vector3(0.0f, 1.0f, 0.0f);
+        //gradient += this.GetVoxel(index - 361).GetDensity() * new Vector3(0.0f, -1.0f, 0.0f);
+        //gradient += this.GetVoxel(index + 19).GetDensity() * new Vector3(0.0f, 0.0f, 1.0f);
+        //gradient += this.GetVoxel(index - 19).GetDensity() * new Vector3(0.0f, 0.0f, -1.0f);
+
+        if (gradient != Vector3.zero)
+        {
+            gradient = math.normalize(gradient);
+        }
 
         return gradient;
     }
@@ -422,54 +416,5 @@ public struct MeshTerrainJob : IJob
     private byte GetMaterial(int index)
     {
         return this.GetVoxel(index).GetMaterial();
-
-        byte material = 0;
-
-        sbyte minDensity = 127;
-
-        Voxel voxelRight = this.GetVoxel(index + 1);
-        Voxel voxelLeft = this.GetVoxel(index - 1);
-        Voxel voxelTop = this.GetVoxel(index + 361);
-        Voxel voxelBottom = this.GetVoxel(index - 361);
-        Voxel voxelFront = this.GetVoxel(index + 19);
-        Voxel voxelBack = this.GetVoxel(index - 19);
-
-        if (voxelRight.GetDensity() < minDensity)
-        {
-            material = voxelRight.GetMaterial();
-            minDensity = voxelRight.GetDensity();
-        }
-
-        if (voxelLeft.GetDensity() < minDensity)
-        {
-            material = voxelLeft.GetMaterial();
-            minDensity = voxelLeft.GetDensity();
-        }
-
-        if (voxelTop.GetDensity() < minDensity)
-        {
-            material = voxelTop.GetMaterial();
-            minDensity = voxelTop.GetDensity();
-        }
-
-        if (voxelBottom.GetDensity() < minDensity)
-        {
-            material = voxelBottom.GetMaterial();
-            minDensity = voxelBottom.GetDensity();
-        }
-
-        if (voxelFront.GetDensity() < minDensity)
-        {
-            material = voxelFront.GetMaterial();
-            minDensity = voxelFront.GetDensity();
-        }
-
-        if (voxelBack.GetDensity() < minDensity)
-        {
-            material = voxelBack.GetMaterial();
-            minDensity = voxelBack.GetDensity();
-        }
-
-        return material;
     }
 }

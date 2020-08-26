@@ -154,6 +154,11 @@ public class World : MonoBehaviour
     private void OnApplicationQuit()
     {
         this.DisposeJobs();
+
+        foreach (KeyValuePair<Vector2Int, ChunkObject> chunkObject in this.chunkObjects)
+        {
+            chunkObject.Value.Destroy();
+        }
     }
 
     private void UpdateWorldEdit()
@@ -1266,6 +1271,14 @@ public class World : MonoBehaviour
         Voxel newVoxel = new Voxel(-128, material);
         VoxelChange voxelChange = new VoxelChange(chunkPosition, index, oldVoxel, newVoxel);
         voxelChanges.Add(voxelChange);
+
+        oldVoxel = chunk.GetVoxel(index + 361);
+        if (!oldVoxel.IsSolid())
+        {
+            newVoxel = new Voxel(0, 0);
+            voxelChange = new VoxelChange(chunkPosition, index + 361, oldVoxel, newVoxel);
+            voxelChanges.Add(voxelChange);
+        }
 
         WorldEditData worldEditData = new WorldEditData(editPosition, voxelChanges);
 

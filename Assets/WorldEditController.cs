@@ -198,11 +198,11 @@ public class WorldEditController : MonoBehaviour
             }
             else if (this.editMode == WorldEdit.EditMode.Add)
             {
-                this.world.WorldEditAdd(selectionPosition, 1);
+                this.world.WorldEditAdd(selectionPosition, 2);
             }
             else if (this.editMode == WorldEdit.EditMode.Substract)
             {
-                this.world.WorldEditSubstract(selectionPosition, 1);
+                this.world.WorldEditSubstract(selectionPosition, 2);
             }
             else if (this.editMode == WorldEdit.EditMode.Paint)
             {
@@ -226,7 +226,7 @@ public class WorldEditController : MonoBehaviour
         }
         else if (this.editMode == WorldEdit.EditMode.Add)
         {
-            findSolid = false;
+            findSolid = true;
         }
         else if (this.editMode == WorldEdit.EditMode.Substract)
         {
@@ -278,25 +278,30 @@ public class WorldEditController : MonoBehaviour
     public void SetEditModeDraw()
     {
         this.SetEditMode(WorldEdit.EditMode.Draw);
+        this.SetApplyMode(WorldEdit.ApplyMode.Click);
     }
 
     public void SetEditModeErase()
     {
         this.SetEditMode(WorldEdit.EditMode.Erase);
+        this.SetApplyMode(WorldEdit.ApplyMode.Click);
     }
 
     public void SetEditModeAdd()
     {
         this.SetEditMode(WorldEdit.EditMode.Add);
+        this.SetApplyMode(WorldEdit.ApplyMode.Hold);
     }
 
     public void SetEditModeSubstract()
     {
         this.SetEditMode(WorldEdit.EditMode.Substract);
+        this.SetApplyMode(WorldEdit.ApplyMode.Hold);
     }
 
     public void SetEditModePaint()
     {
         this.SetEditMode(WorldEdit.EditMode.Paint);
+        this.SetApplyMode(WorldEdit.ApplyMode.Hold);
     }
 }

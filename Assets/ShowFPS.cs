@@ -20,7 +20,7 @@ public class ShowFPS : MonoBehaviour
         frameCount++;
         if (timer >= 1.0f)
         {
-            this.GetComponent<Text>().text = frameCount.ToString();
+            this.GetComponent<Text>().text = "FPS: " + frameCount.ToString();
             frameCount = 0;
             timer = 0.0f;
         }
