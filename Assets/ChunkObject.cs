@@ -5,6 +5,7 @@ using Unity.Collections;
 
 public class ChunkObject
 {
+    public GameObject wrapperObject;
     public GameObject rendererObject;
     public GameObject[] colliderObjects;
     public Mesh rendererMesh;
@@ -14,10 +15,16 @@ public class ChunkObject
 
     public ChunkObject(Vector2Int chunkPosition, Material material)
     {
+        this.wrapperObject = new GameObject();
+        this.wrapperObject.transform.position = new Vector3(chunkPosition.x * 16.0f, 0.0f, chunkPosition.y * 16.0f);
+        this.wrapperObject.name = "Chunk Wrapper (" + chunkPosition.x.ToString() + ", " + chunkPosition.y.ToString() + ")";
+
         this.isActive = true;
         this.rendererObject = new GameObject();
+        this.rendererObject.transform.SetParent(this.wrapperObject.transform);
         this.rendererObject.name = "Chunk Renderer (" + chunkPosition.x.ToString() + ", " + chunkPosition.y.ToString() + ")";
-        this.rendererObject.transform.position = new Vector3(chunkPosition.x * 16.0f, 0.0f, chunkPosition.y * 16.0f);
+        this.rendererObject.transform.localPosition = Vector3.zero;
+        //this.rendererObject.transform.position = new Vector3(chunkPosition.x * 16.0f, 0.0f, chunkPosition.y * 16.0f);
         this.rendererObject.AddComponent<MeshFilter>();
         this.rendererObject.AddComponent<MeshRenderer>();
         this.rendererObject.GetComponent<MeshRenderer>().material = material;
@@ -31,12 +38,14 @@ public class ChunkObject
         for (int i = 0; i < 16; i++)
         {
             this.colliderObjects[i] = new GameObject();
+            this.colliderObjects[i].transform.SetParent(this.wrapperObject.transform);
             this.colliderObjects[i].tag = "Terrain";
             this.colliderObjects[i].layer = 8;
             this.colliderObjects[i].name = "Chunk Collider (" + chunkPosition.x.ToString() + ", " + i + ", " + chunkPosition.y.ToString() + ")";
-            this.colliderObjects[i].transform.position = new Vector3(chunkPosition.x * 16.0f, i * 16.0f, chunkPosition.y * 16.0f);
-            this.colliderObjects[i].AddComponent<MeshCollider>();
+            //this.colliderObjects[i].transform.position = new Vector3(chunkPosition.x * 16.0f, i * 16.0f, chunkPosition.y * 16.0f);
+            this.colliderObjects[i].transform.position = new Vector3(0.0f, i * 16.0f, 0.0f);
             this.colliderObjects[i].SetActive(false);
+            this.colliderObjects[i].AddComponent<MeshCollider>();
             this.colliderMeshes[i] = new Mesh();
             this.colliderMeshes[i].name = "Chunk Collider Mesh (" + chunkPosition.x.ToString() + ", " + i + ", " + chunkPosition.y.ToString() + ")";
         }
@@ -50,26 +59,13 @@ public class ChunkObject
     public void Activate()
     {
         this.isActive = true;
-        this.rendererObject.SetActive(true);
-
-        for (int i = 0; i < 16; i++)
-        {
-            if (this.colliderMeshes[i].vertexCount > 0)
-            {
-                this.colliderObjects[i].SetActive(true);
-            }
-        }
+        this.wrapperObject.SetActive(true);
     }
 
     public void Deactivate()
     {
         this.isActive = false;
-        this.rendererObject.SetActive(false);
-
-        for (int i = 0; i < 16; i++)
-        {
-            this.colliderObjects[i].SetActive(false);
-        }
+        this.wrapperObject.SetActive(false);
     }
 
     public void SetRenderer(NativeArray<Vector3> vertices, NativeArray<Vector3> normals, NativeArray<int> indices, NativeArray<Vector4> weights1234, NativeArray<Vector4> weights5678, NativeArray<Vector4> mats1234, NativeArray<Vector4> mats5678, NativeArray<Vector2> lights)
@@ -101,12 +97,11 @@ public class ChunkObject
 
     public void Destroy()
     {
-        UnityEngine.Object.Destroy(this.rendererObject);
-        UnityEngine.Object.Destroy(this.rendererMesh);
+        UnityEngine.Object.Destroy(this.wrapperObject);
 
+        UnityEngine.Object.Destroy(this.rendererMesh);
         for (int i = 0; i < 16; i++)
         {
-            UnityEngine.Object.Destroy(this.colliderObjects[i]);
             UnityEngine.Object.Destroy(this.colliderMeshes[i]);
         }
     }

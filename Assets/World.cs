@@ -23,6 +23,9 @@ public class World : MonoBehaviour
     private Vector2Int playerChunkPositionLast = new Vector2Int(2147483647, 2147483647);
     private bool didPlayerEnterChunk = false;
 
+    private Vector2Int chunkLoadingOrigin;
+    private bool didChunkLoadingOriginChange = false;
+
     // Material
     public Material terrainMaterial;
     public Texture2D[] chunkTexturesColor;
@@ -70,6 +73,7 @@ public class World : MonoBehaviour
     // Clean Up
     private Queue<Vector2Int> chunksToDestroy = new Queue<Vector2Int>();
     private Queue<Vector2Int> chunksToDeactivate = new Queue<Vector2Int>();
+    private Queue<Vector2Int> chunksToLoad = new Queue<Vector2Int>();
 
     // Chunk Loading
     private List<Vector2Int> chunkLoadingOrder = new List<Vector2Int>();
@@ -82,73 +86,24 @@ public class World : MonoBehaviour
 
     private void Start()
     {
+        this.InitChunkLoadingOrder();
         this.InitMaterial();
         this.InitJobs();
-
-        this.playerWorldPositionLast = this.playerWorldPosition.position;
-
-        int arraySize = (this.chunkDistance + 2) * 2 + 1;
-        arraySize = arraySize * arraySize;
-        List<Vector2Int> chunkLoadingOrder = new List<Vector2Int>();
-
-        Vector2Int currentPosition = Vector2Int.zero;
-        int iterator = 1;
-        int i = 0;
-
-        while (i < arraySize)
-        {
-            for (int j = 1; j <= iterator; j++)
-            {
-                chunkLoadingOrder.Add(currentPosition);
-
-                if (iterator % 2 == 1)
-                    currentPosition.y++;
-                else
-                    currentPosition.y--;
-
-                i++;
-            }
-
-            for (int j = 1; j <= iterator; j++)
-            {
-                chunkLoadingOrder.Add(currentPosition);
-
-                if (iterator % 2 == 1)
-                    currentPosition.x++;
-                else
-                    currentPosition.x--;
-
-                i++;
-            }
-
-            iterator++;
-        }
-
-        this.chunkLoadingOrder = chunkLoadingOrder;
     }
 
     private void Update()
     {
-        this.UpdatePlayerChunkPosition();
-
-        if (!this.chunkObjects.ContainsKey(this.playerChunkPosition))
-            this.playerGameObject.GetComponent<PlayerController>().Stop();
-
+        this.UpdatePlayerPosition();
+        this.UpdateChunkLoadingOrigin();
         this.UpdateChunkQueue();
+
         this.UnloadChunks();
         this.LoadChunks();
         this.GenerateTerrains();
-        this.GenerateLights(); // 3ms (SetSunLightsFromNative)
-        this.GenerateMeshes(); // 9-14ms (creating mesh 5ms & uploading meshcollider 5ms)
+        this.GenerateLights();
+        this.GenerateMeshes();
         this.UpdateWorldEdit();
-
-        /*
-        Debug.Log("Terrain Queue: " + this.generateTerrainQueue.Count);
-        Debug.Log("Lights Queue: " + this.generateLightsQueue.Count);
-        Debug.Log("Mesh Queue: " + this.generateMeshQueue.Count);
-        */
-
-        this.UpdatePlayerChunkPositionLast();
+        this.UpdatePlayerPositionLast();
     }
 
     private void OnApplicationQuit()
@@ -160,6 +115,364 @@ public class World : MonoBehaviour
             chunkObject.Value.Destroy();
         }
     }
+
+    /// <summary>
+    /// Populates the chunk loading order list in a spiral sequence.
+    /// </summary>
+    private void InitChunkLoadingOrder()
+    {
+        this.chunkLoadingOrder.Clear();
+
+        int arraySize = (this.chunkDistance + 2) * 2 + 1;
+        arraySize *= arraySize;
+
+        Vector2Int currentPosition = Vector2Int.zero;
+        int iterator = 1;
+        int i = 0;
+
+        this.chunkLoadingOrder.Add(currentPosition);
+        while (i < arraySize)
+        {
+            for (int j = 1; j <= iterator; j++)
+            {
+                if (iterator % 2 == 1)
+                    currentPosition.y++;
+                else
+                    currentPosition.y--;
+
+                this.chunkLoadingOrder.Add(currentPosition);
+                i++;
+            }
+
+            for (int j = 1; j <= iterator; j++)
+            {
+                if (iterator % 2 == 1)
+                    currentPosition.x++;
+                else
+                    currentPosition.x--;
+
+                this.chunkLoadingOrder.Add(currentPosition);
+                i++;
+            }
+
+            iterator++;
+        }
+    }
+
+    /// <summary>
+    /// Populates the texture array for the terrain material.
+    /// </summary>
+    private void InitMaterial()
+    {
+        Texture2DArray texColor = new Texture2DArray(1024, 1024, 6, TextureFormat.RGBA32, true, false);
+        texColor.filterMode = FilterMode.Trilinear;
+        texColor.anisoLevel = 8;
+        texColor.wrapMode = TextureWrapMode.Repeat;
+        int count = 0;
+        foreach (Texture2D texture in this.chunkTexturesColor)
+        {
+            texColor.SetPixels(texture.GetPixels(), count, 0);
+            count++;
+        }
+        texColor.Apply();
+
+        Texture2DArray texHeight = new Texture2DArray(1024, 1024, 6, TextureFormat.RGBA32, true, false);
+        texHeight.filterMode = FilterMode.Trilinear;
+        texHeight.anisoLevel = 8;
+        texHeight.wrapMode = TextureWrapMode.Repeat;
+        count = 0;
+        foreach (Texture2D texture in this.chunkTexturesHeight)
+        {
+            texHeight.SetPixels(texture.GetPixels(), count, 0);
+            count++;
+        }
+        texHeight.Apply();
+
+        this.terrainMaterial.SetTexture("_TexColor", texColor);
+        this.terrainMaterial.SetTexture("_TexHeight", texHeight);
+    }
+
+    /// <summary>
+    /// Allocates memory for all jobs
+    /// </summary>
+    private void InitJobs()
+    {
+        // Terrain Job
+        this.generateTerrainJob.voxels = new NativeArray<Voxel>(65536, Allocator.Persistent);
+        this.generateTerrainJob.heights = new NativeArray<float>(256, Allocator.Persistent);
+
+        // Light Job
+        this.sunLightJob.lights = new NativeArray<byte>(65536, Allocator.Persistent);
+        this.sunLightJob.lightQueue = new NativeQueue<int3>(Allocator.Persistent);
+        this.sunLightJob.isSolid = new NativeArray<bool>(589824, Allocator.Persistent);
+        this.sunLightJob.sunLights = new NativeArray<byte>(589824, Allocator.Persistent);
+        this.sunLightJob.voxels00 = new NativeArray<Voxel>(65536, Allocator.Persistent);
+        this.sunLightJob.voxels10 = new NativeArray<Voxel>(65536, Allocator.Persistent);
+        this.sunLightJob.voxels20 = new NativeArray<Voxel>(65536, Allocator.Persistent);
+        this.sunLightJob.voxels01 = new NativeArray<Voxel>(65536, Allocator.Persistent);
+        this.sunLightJob.voxels11 = new NativeArray<Voxel>(65536, Allocator.Persistent);
+        this.sunLightJob.voxels21 = new NativeArray<Voxel>(65536, Allocator.Persistent);
+        this.sunLightJob.voxels02 = new NativeArray<Voxel>(65536, Allocator.Persistent);
+        this.sunLightJob.voxels12 = new NativeArray<Voxel>(65536, Allocator.Persistent);
+        this.sunLightJob.voxels22 = new NativeArray<Voxel>(65536, Allocator.Persistent);
+
+        // Light Removal Job
+        this.lightRemovalJob = new LightRemovalJob()
+        {
+            voxels = new NativeArray<Voxel>(589824, Allocator.Persistent),
+            lights = new NativeArray<byte>(589824, Allocator.Persistent),
+            sunLightSpreadQueue = new NativeQueue<int>(Allocator.Persistent),
+            sunLightRemovalQueue = new NativeQueue<int>(Allocator.Persistent),
+            sourceLightRemovalQueue = new NativeQueue<int>(Allocator.Persistent),
+            sourceLightSpreadQueue = new NativeQueue<int>(Allocator.Persistent),
+            chunksTouched = new NativeArray<bool>(9, Allocator.Persistent),
+            voxels00 = new NativeArray<Voxel>(65536, Allocator.Persistent),
+            voxels10 = new NativeArray<Voxel>(65536, Allocator.Persistent),
+            voxels20 = new NativeArray<Voxel>(65536, Allocator.Persistent),
+            voxels01 = new NativeArray<Voxel>(65536, Allocator.Persistent),
+            voxels11 = new NativeArray<Voxel>(65536, Allocator.Persistent),
+            voxels21 = new NativeArray<Voxel>(65536, Allocator.Persistent),
+            voxels02 = new NativeArray<Voxel>(65536, Allocator.Persistent),
+            voxels12 = new NativeArray<Voxel>(65536, Allocator.Persistent),
+            voxels22 = new NativeArray<Voxel>(65536, Allocator.Persistent),
+            lights00 = new NativeArray<byte>(65536, Allocator.Persistent),
+            lights10 = new NativeArray<byte>(65536, Allocator.Persistent),
+            lights20 = new NativeArray<byte>(65536, Allocator.Persistent),
+            lights01 = new NativeArray<byte>(65536, Allocator.Persistent),
+            lights11 = new NativeArray<byte>(65536, Allocator.Persistent),
+            lights21 = new NativeArray<byte>(65536, Allocator.Persistent),
+            lights02 = new NativeArray<byte>(65536, Allocator.Persistent),
+            lights12 = new NativeArray<byte>(65536, Allocator.Persistent),
+            lights22 = new NativeArray<byte>(65536, Allocator.Persistent)
+        };
+
+        // Mesh Job
+        this.meshTerrainJob = new MeshTerrainJob()
+        {
+            vertexNormals = new NativeHashMap<Vector3, Vector3>(500000, Allocator.Persistent),
+            breakPoints = new NativeList<int2>(Allocator.Persistent),
+            voxelsMerged = new NativeArray<Voxel>(92416, Allocator.Persistent),
+            lightsMerged = new NativeArray<byte>(92416, Allocator.Persistent),
+            mcCornerPositions = new NativeArray<float3>(Tables.cornerPositions.Length, Allocator.Persistent),
+            mcCellClasses = new NativeArray<byte>(Tables.cellClasses.Length, Allocator.Persistent),
+            mcCellGeometryCounts = new NativeArray<int>(Tables.cellGeometryCounts.Length, Allocator.Persistent),
+            mcCellIndices = new NativeArray<int>(Tables.cellIndices.Length, Allocator.Persistent),
+            mcCellVertexData = new NativeArray<ushort>(Tables.cellVertexData.Length, Allocator.Persistent),
+            voxels00 = new NativeArray<Voxel>(65536, Allocator.Persistent),
+            lights00 = new NativeArray<byte>(65536, Allocator.Persistent),
+            voxels10 = new NativeArray<Voxel>(65536, Allocator.Persistent),
+            lights10 = new NativeArray<byte>(65536, Allocator.Persistent),
+            voxels20 = new NativeArray<Voxel>(65536, Allocator.Persistent),
+            lights20 = new NativeArray<byte>(65536, Allocator.Persistent),
+            voxels01 = new NativeArray<Voxel>(65536, Allocator.Persistent),
+            lights01 = new NativeArray<byte>(65536, Allocator.Persistent),
+            voxels11 = new NativeArray<Voxel>(65536, Allocator.Persistent),
+            lights11 = new NativeArray<byte>(65536, Allocator.Persistent),
+            voxels21 = new NativeArray<Voxel>(65536, Allocator.Persistent),
+            lights21 = new NativeArray<byte>(65536, Allocator.Persistent),
+            voxels02 = new NativeArray<Voxel>(65536, Allocator.Persistent),
+            lights02 = new NativeArray<byte>(65536, Allocator.Persistent),
+            voxels12 = new NativeArray<Voxel>(65536, Allocator.Persistent),
+            lights12 = new NativeArray<byte>(65536, Allocator.Persistent),
+            voxels22 = new NativeArray<Voxel>(65536, Allocator.Persistent),
+            lights22 = new NativeArray<byte>(65536, Allocator.Persistent),
+            vertices = new NativeList<Vector3>(Allocator.Persistent),
+            normals = new NativeList<Vector3>(Allocator.Persistent),
+            indices = new NativeList<int>(Allocator.Persistent),
+            lights = new NativeList<Vector2>(Allocator.Persistent),
+            mats1234 = new NativeList<Vector4>(Allocator.Persistent),
+            mats5678 = new NativeList<Vector4>(Allocator.Persistent),
+            weights1234 = new NativeList<Vector4>(Allocator.Persistent),
+            weights5678 = new NativeList<Vector4>(Allocator.Persistent),
+            cornerPositions = new NativeArray<float3>(8, Allocator.Persistent),
+            cornerVoxels = new NativeArray<Voxel>(8, Allocator.Persistent),
+            cornerLights = new NativeArray<float2>(8, Allocator.Persistent),
+            cornerIndices = new NativeArray<int>(8, Allocator.Persistent),
+            cellIndices = new NativeList<int>(Allocator.Persistent),
+            mappedIndices = new NativeList<ushort>(Allocator.Persistent)
+        };
+
+        this.meshTerrainJob.mcCornerPositions.CopyFrom(Tables.cornerPositions);
+        this.meshTerrainJob.mcCellClasses.CopyFrom(Tables.cellClasses);
+        this.meshTerrainJob.mcCellGeometryCounts.CopyFrom(Tables.cellGeometryCounts);
+        this.meshTerrainJob.mcCellIndices.CopyFrom(Tables.cellIndices);
+        this.meshTerrainJob.mcCellVertexData.CopyFrom(Tables.cellVertexData);
+
+        // World Edit Mesh Job
+        this.worldEditMeshJob = new MeshTerrainJob()
+        {
+            vertexNormals = new NativeHashMap<Vector3, Vector3>(500000, Allocator.Persistent),
+            breakPoints = new NativeList<int2>(Allocator.Persistent),
+            voxelsMerged = new NativeArray<Voxel>(92416, Allocator.Persistent),
+            lightsMerged = new NativeArray<byte>(92416, Allocator.Persistent),
+            mcCornerPositions = new NativeArray<float3>(Tables.cornerPositions.Length, Allocator.Persistent),
+            mcCellClasses = new NativeArray<byte>(Tables.cellClasses.Length, Allocator.Persistent),
+            mcCellGeometryCounts = new NativeArray<int>(Tables.cellGeometryCounts.Length, Allocator.Persistent),
+            mcCellIndices = new NativeArray<int>(Tables.cellIndices.Length, Allocator.Persistent),
+            mcCellVertexData = new NativeArray<ushort>(Tables.cellVertexData.Length, Allocator.Persistent),
+            voxels00 = new NativeArray<Voxel>(65536, Allocator.Persistent),
+            lights00 = new NativeArray<byte>(65536, Allocator.Persistent),
+            voxels10 = new NativeArray<Voxel>(65536, Allocator.Persistent),
+            lights10 = new NativeArray<byte>(65536, Allocator.Persistent),
+            voxels20 = new NativeArray<Voxel>(65536, Allocator.Persistent),
+            lights20 = new NativeArray<byte>(65536, Allocator.Persistent),
+            voxels01 = new NativeArray<Voxel>(65536, Allocator.Persistent),
+            lights01 = new NativeArray<byte>(65536, Allocator.Persistent),
+            voxels11 = new NativeArray<Voxel>(65536, Allocator.Persistent),
+            lights11 = new NativeArray<byte>(65536, Allocator.Persistent),
+            voxels21 = new NativeArray<Voxel>(65536, Allocator.Persistent),
+            lights21 = new NativeArray<byte>(65536, Allocator.Persistent),
+            voxels02 = new NativeArray<Voxel>(65536, Allocator.Persistent),
+            lights02 = new NativeArray<byte>(65536, Allocator.Persistent),
+            voxels12 = new NativeArray<Voxel>(65536, Allocator.Persistent),
+            lights12 = new NativeArray<byte>(65536, Allocator.Persistent),
+            voxels22 = new NativeArray<Voxel>(65536, Allocator.Persistent),
+            lights22 = new NativeArray<byte>(65536, Allocator.Persistent),
+            vertices = new NativeList<Vector3>(Allocator.Persistent),
+            normals = new NativeList<Vector3>(Allocator.Persistent),
+            indices = new NativeList<int>(Allocator.Persistent),
+            lights = new NativeList<Vector2>(Allocator.Persistent),
+            mats1234 = new NativeList<Vector4>(Allocator.Persistent),
+            mats5678 = new NativeList<Vector4>(Allocator.Persistent),
+            weights1234 = new NativeList<Vector4>(Allocator.Persistent),
+            weights5678 = new NativeList<Vector4>(Allocator.Persistent),
+            cornerPositions = new NativeArray<float3>(8, Allocator.Persistent),
+            cornerVoxels = new NativeArray<Voxel>(8, Allocator.Persistent),
+            cornerLights = new NativeArray<float2>(8, Allocator.Persistent),
+            cornerIndices = new NativeArray<int>(8, Allocator.Persistent),
+            cellIndices = new NativeList<int>(Allocator.Persistent),
+            mappedIndices = new NativeList<ushort>(Allocator.Persistent)
+        };
+
+        this.worldEditMeshJob.mcCornerPositions.CopyFrom(Tables.cornerPositions);
+        this.worldEditMeshJob.mcCellClasses.CopyFrom(Tables.cellClasses);
+        this.worldEditMeshJob.mcCellGeometryCounts.CopyFrom(Tables.cellGeometryCounts);
+        this.worldEditMeshJob.mcCellIndices.CopyFrom(Tables.cellIndices);
+        this.worldEditMeshJob.mcCellVertexData.CopyFrom(Tables.cellVertexData);
+    }
+
+    /// <summary>
+    /// Updates playerChunkPosition and sets didPlayerEnterChunk.
+    /// </summary>
+    private void UpdatePlayerPosition()
+    {
+        this.didPlayerEnterChunk = false;
+
+        this.playerChunkPosition = this.WorldToChunkPosition(this.playerWorldPosition.position);
+        this.didPlayerEnterChunk = (this.playerChunkPosition != this.playerChunkPositionLast);
+    }
+
+    /// <summary>
+    /// Updates chunkLoadingOrigin if the player entered a chunk that is 2 chunks away from the chunkLoadingOrigin.
+    /// </summary>
+    private void UpdateChunkLoadingOrigin()
+    {
+        this.didChunkLoadingOriginChange = false;
+
+        if (!this.didPlayerEnterChunk)
+        {
+            return;
+        }
+
+        int distanceX = Mathf.Abs(this.chunkLoadingOrigin.x - this.playerChunkPosition.x);
+        int distanceZ = Mathf.Abs(this.chunkLoadingOrigin.y - this.playerChunkPosition.y);
+        if (distanceX < 2 && distanceZ < 2)
+        {
+            return;
+        }
+
+        this.chunkLoadingOrigin = this.playerChunkPosition;
+        this.didChunkLoadingOriginChange = true;
+    }
+
+    /// <summary>
+    /// If didChunkLoadingOriginChange is true:<br />
+    /// Clears generateTerrainQueue, generateLightsQueue and generateMeshQueue.<br />
+    /// Sets isUpdateChunkQueuePending to true.<br />
+    /// If isUpdateChunkQueuePending is true and generateTerrainJob, sunLightJob and meshTerrainJob are done:<br />
+    /// Queues up chunksToDestroy, chunksToDeactivate and chunksToLoad if chunkLoadingOrigin changed.
+    /// </summary>
+    private void UpdateChunkQueue()
+    {
+        if (this.didChunkLoadingOriginChange)
+        {
+            this.generateTerrainQueue.Clear();
+            this.generateLightsQueue.Clear();
+            this.generateMeshQueue.Clear();
+            this.isUpdateChunkQueuePending = true;
+        }
+
+        if (!this.isUpdateChunkQueuePending)
+        {
+            return;
+        }
+
+        if (!this.generateTerrainJobDone || !this.sunLightJobDone || !this.meshTerrainJobDone)
+        {
+            return;
+        }
+
+        foreach (KeyValuePair<Vector2Int, Chunk> chunk in this.chunks)
+        {
+            if (!this.IsInChunkDistance(chunk.Key, 2))
+            {
+                this.chunksToDestroy.Enqueue(chunk.Key);
+            }
+        }
+
+        foreach (KeyValuePair<Vector2Int, ChunkObject> chunkObject in this.chunkObjects)
+        {
+            if (!this.IsInChunkDistance(chunkObject.Key) && this.IsInChunkDistance(chunkObject.Key, 2))
+            {
+                this.chunksToDeactivate.Enqueue(chunkObject.Key);
+            }
+        }
+
+        foreach (Vector2Int offset in this.chunkLoadingOrder)
+        {
+            Vector2Int chunkPosition = this.playerChunkPosition + offset;
+            this.chunksToLoad.Enqueue(chunkPosition);
+        }
+
+        this.isUpdateChunkQueuePending = false;
+    }
+
+    /// <summary>
+    /// 
+    /// </summary>
+    private void UnloadChunks()
+    {
+        int count = 0;
+        this.startStopwatch();
+
+        while (this.chunksToDestroy.Count > 0)
+        {
+            Vector2Int chunkPosition = this.chunksToDestroy.Dequeue();
+
+            if (this.chunks[chunkPosition].hasObjects)
+            {
+                this.chunkObjects[chunkPosition].Destroy();
+                this.chunkObjects.Remove(chunkPosition);
+            }
+            this.chunks.Remove(chunkPosition);
+
+            count++;
+        }
+
+        while (this.chunksToDeactivate.Count > 0)
+        {
+            Vector2Int chunkPosition = this.chunksToDeactivate.Dequeue();
+            this.chunkObjects[chunkPosition].Deactivate();
+
+            count++;
+        }
+
+        this.stopStopwatch("Destroying and disabling " + count.ToString() + " chunks", 1);
+    }
+
+    //////////////////////////////////////////////////////////////////////////////////////////////////////////
+    //////////////////////////////////////////////////////////////////////////////////////////////////////////
+    //////////////////////////////////////////////////////////////////////////////////////////////////////////
 
     private void UpdateWorldEdit()
     {
@@ -534,76 +847,6 @@ public class World : MonoBehaviour
         }
     }
 
-    private void UpdateChunkQueue()
-    {
-        if (this.didPlayerEnterChunk)
-        {
-            this.generateTerrainQueue.Clear();
-            this.generateLightsQueue.Clear();
-            this.generateMeshQueue.Clear();
-            this.isUpdateChunkQueuePending = true;
-        }
-
-        if (this.isUpdateChunkQueuePending)
-        {
-            if (this.generateTerrainJobDone == false) return;
-            if (this.sunLightJobDone == false) return;
-            if (this.meshTerrainJobDone == false) return;
-        }
-
-        if (!this.isUpdateChunkQueuePending)
-            return;
-
-        this.generateTerrainQueue.Clear();
-        this.generateLightsQueue.Clear();
-        this.generateMeshQueue.Clear();
-
-        this.isUpdateChunkQueuePending = false;
-
-        foreach (KeyValuePair<Vector2Int, Chunk> chunk in this.chunks)
-        {
-            if (!this.IsInChunkDistance(chunk.Key, 2))
-            {
-                this.chunksToDestroy.Enqueue(chunk.Key);
-            }
-        }
-
-        foreach (KeyValuePair<Vector2Int, ChunkObject> chunkObject in this.chunkObjects)
-        {
-            if (!this.IsInChunkDistance(chunkObject.Key) && this.IsInChunkDistance(chunkObject.Key, 2))
-            {
-                this.chunksToDeactivate.Enqueue(chunkObject.Key);
-            }
-        }
-
-        foreach (Vector2Int offset in this.chunkLoadingOrder)
-        {
-            Vector2Int chunkPosition = this.playerChunkPosition + offset;
-            this.loadChunkQueue.Enqueue(chunkPosition);
-        }
-    }
-
-    private void UnloadChunks()
-    {
-        while (this.chunksToDestroy.Count > 0)
-        {
-            Vector2Int chunkPosition = this.chunksToDestroy.Dequeue();
-
-            if (this.chunks[chunkPosition].hasObjects)
-            {
-                this.chunkObjects[chunkPosition].Destroy();
-                this.chunkObjects.Remove(chunkPosition);
-            }
-            this.chunks.Remove(chunkPosition);
-        }
-
-        while (this.chunksToDeactivate.Count > 0)
-        {
-            Vector2Int chunkPosition = this.chunksToDeactivate.Dequeue();
-            this.chunkObjects[chunkPosition].Deactivate();
-        }
-    }
-
     private void LoadChunks()
     {
         while (this.loadChunkQueue.Count > 0)
@@ -888,200 +1131,6 @@ public class World : MonoBehaviour
             this.chunks[chunkPosition].hasObjects = true;
         }
     }
-
-    //
-    // Initialization
-    //
-
-    private void InitMaterial()
-    {
-        Texture2DArray texColor = new Texture2DArray(1024, 1024, 6, TextureFormat.RGBA32, true, false);
-        texColor.filterMode = FilterMode.Trilinear;
-        texColor.anisoLevel = 8;
-        texColor.wrapMode = TextureWrapMode.Repeat;
-        int count = 0;
-        foreach (Texture2D texture in this.chunkTexturesColor)
-        {
-            texColor.SetPixels(texture.GetPixels(), count, 0);
-            count++;
-        }
-        texColor.Apply();
-
-        Texture2DArray texHeight = new Texture2DArray(1024, 1024, 6, TextureFormat.RGBA32, true, false);
-        texHeight.filterMode = FilterMode.Trilinear;
-        texHeight.anisoLevel = 8;
-        texHeight.wrapMode = TextureWrapMode.Repeat;
-        count = 0;
-        foreach (Texture2D texture in this.chunkTexturesHeight)
-        {
-            texHeight.SetPixels(texture.GetPixels(), count, 0);
-            count++;
-        }
-        texHeight.Apply();
-
-        this.terrainMaterial.SetTexture("_TexColor", texColor);
-        this.terrainMaterial.SetTexture("_TexHeight", texHeight);
-    }
-
-    private void InitJobs()
-    {
-        // Terrain Job
-        this.generateTerrainJob.voxels = new NativeArray<Voxel>(65536, Allocator.Persistent);
-        this.generateTerrainJob.heights = new NativeArray<float>(256, Allocator.Persistent);
-
-        // Light Job
-        this.sunLightJob.lights = new NativeArray<byte>(65536, Allocator.Persistent);
-        this.sunLightJob.lightQueue = new NativeQueue<int3>(Allocator.Persistent);
-        this.sunLightJob.isSolid = new NativeArray<bool>(589824, Allocator.Persistent);
-        this.sunLightJob.sunLights = new NativeArray<byte>(589824, Allocator.Persistent);
-        this.sunLightJob.voxels00 = new NativeArray<Voxel>(65536, Allocator.Persistent);
-        this.sunLightJob.voxels10 = new NativeArray<Voxel>(65536, Allocator.Persistent);
-        this.sunLightJob.voxels20 = new NativeArray<Voxel>(65536, Allocator.Persistent);
-        this.sunLightJob.voxels01 = new NativeArray<Voxel>(65536, Allocator.Persistent);
-        this.sunLightJob.voxels11 = new NativeArray<Voxel>(65536, Allocator.Persistent);
-        this.sunLightJob.voxels21 = new NativeArray<Voxel>(65536, Allocator.Persistent);
-        this.sunLightJob.voxels02 = new NativeArray<Voxel>(65536, Allocator.Persistent);
-        this.sunLightJob.voxels12 = new NativeArray<Voxel>(65536, Allocator.Persistent);
-        this.sunLightJob.voxels22 = new NativeArray<Voxel>(65536, Allocator.Persistent);
-
-        // Light Removal Job
-        this.lightRemovalJob = new LightRemovalJob()
-        {
-            voxels = new NativeArray<Voxel>(589824, Allocator.Persistent),
-            lights = new NativeArray<byte>(589824, Allocator.Persistent),
-            sunLightSpreadQueue = new NativeQueue<int>(Allocator.Persistent),
-            sunLightRemovalQueue = new NativeQueue<int>(Allocator.Persistent),
-            sourceLightRemovalQueue = new NativeQueue<int>(Allocator.Persistent),
-            sourceLightSpreadQueue = new NativeQueue<int>(Allocator.Persistent),
-            chunksTouched = new NativeArray<bool>(9, Allocator.Persistent),
-            voxels00 = new NativeArray<Voxel>(65536, Allocator.Persistent),
-            voxels10 = new NativeArray<Voxel>(65536, Allocator.Persistent),
-            voxels20 = new NativeArray<Voxel>(65536, Allocator.Persistent),
-            voxels01 = new NativeArray<Voxel>(65536, Allocator.Persistent),
-            voxels11 = new NativeArray<Voxel>(65536, Allocator.Persistent),
-            voxels21 = new NativeArray<Voxel>(65536, Allocator.Persistent),
-            voxels02 = new NativeArray<Voxel>(65536, Allocator.Persistent),
-            voxels12 = new NativeArray<Voxel>(65536, Allocator.Persistent),
-            voxels22 = new NativeArray<Voxel>(65536, Allocator.Persistent),
-            lights00 = new NativeArray<byte>(65536, Allocator.Persistent),
-            lights10 = new NativeArray<byte>(65536, Allocator.Persistent),
-            lights20 = new NativeArray<byte>(65536, Allocator.Persistent),
-            lights01 = new NativeArray<byte>(65536, Allocator.Persistent),
-            lights11 = new NativeArray<byte>(65536, Allocator.Persistent),
-            lights21 = new NativeArray<byte>(65536, Allocator.Persistent),
-            lights02 = new NativeArray<byte>(65536, Allocator.Persistent),
-            lights12 = new NativeArray<byte>(65536, Allocator.Persistent),
-            lights22 = new NativeArray<byte>(65536, Allocator.Persistent)
-        };
-
-        // Mesh Job
-        this.meshTerrainJob = new MeshTerrainJob()
-        {
-            vertexNormals = new NativeHashMap<Vector3, Vector3>(500000, Allocator.Persistent),
-            breakPoints = new NativeList<int2>(Allocator.Persistent),
-            voxelsMerged = new NativeArray<Voxel>(92416, Allocator.Persistent),
-            lightsMerged = new NativeArray<byte>(92416, Allocator.Persistent),
-            mcCornerPositions = new NativeArray<float3>(Tables.cornerPositions.Length, Allocator.Persistent),
-            mcCellClasses = new NativeArray<byte>(Tables.cellClasses.Length, Allocator.Persistent),
-            mcCellGeometryCounts = new NativeArray<int>(Tables.cellGeometryCounts.Length, Allocator.Persistent),
-            mcCellIndices = new NativeArray<int>(Tables.cellIndices.Length, Allocator.Persistent),
-            mcCellVertexData = new NativeArray<ushort>(Tables.cellVertexData.Length, Allocator.Persistent),
-            voxels00 = new NativeArray<Voxel>(65536, Allocator.Persistent),
-            lights00 = new NativeArray<byte>(65536, Allocator.Persistent),
-            voxels10 = new NativeArray<Voxel>(65536, Allocator.Persistent),
-            lights10 = new NativeArray<byte>(65536, Allocator.Persistent),
-            voxels20 = new NativeArray<Voxel>(65536, Allocator.Persistent),
-            lights20 = new NativeArray<byte>(65536, Allocator.Persistent),
-            voxels01 = new NativeArray<Voxel>(65536, Allocator.Persistent),
-            lights01 = new NativeArray<byte>(65536, Allocator.Persistent),
-            voxels11 = new NativeArray<Voxel>(65536, Allocator.Persistent),
-            lights11 = new NativeArray<byte>(65536, Allocator.Persistent),
-            voxels21 = new NativeArray<Voxel>(65536, Allocator.Persistent),
-            lights21 = new NativeArray<byte>(65536, Allocator.Persistent),
-            voxels02 = new NativeArray<Voxel>(65536, Allocator.Persistent),
-            lights02 = new NativeArray<byte>(65536, Allocator.Persistent),
-            voxels12 = new NativeArray<Voxel>(65536, Allocator.Persistent),
-            lights12 = new NativeArray<byte>(65536, Allocator.Persistent),
-            voxels22 = new NativeArray<Voxel>(65536, Allocator.Persistent),
-            lights22 = new NativeArray<byte>(65536, Allocator.Persistent),
-            vertices = new NativeList<Vector3>(Allocator.Persistent),
-            normals = new NativeList<Vector3>(Allocator.Persistent),
-            indices = new NativeList<int>(Allocator.Persistent),
-            lights = new NativeList<Vector2>(Allocator.Persistent),
-            mats1234 = new NativeList<Vector4>(Allocator.Persistent),
-            mats5678 = new NativeList<Vector4>(Allocator.Persistent),
-            weights1234 = new NativeList<Vector4>(Allocator.Persistent),
-            weights5678 = new NativeList<Vector4>(Allocator.Persistent),
-            cornerPositions = new NativeArray<float3>(8, Allocator.Persistent),
-            cornerVoxels = new NativeArray<Voxel>(8, Allocator.Persistent),
-            cornerLights = new NativeArray<float2>(8, Allocator.Persistent),
-            cornerIndices = new NativeArray<int>(8, Allocator.Persistent),
-            cellIndices = new NativeList<int>(Allocator.Persistent),
-            mappedIndices = new NativeList<ushort>(Allocator.Persistent)
-        };
-
-        this.meshTerrainJob.mcCornerPositions.CopyFrom(Tables.cornerPositions);
-        this.meshTerrainJob.mcCellClasses.CopyFrom(Tables.cellClasses);
-        this.meshTerrainJob.mcCellGeometryCounts.CopyFrom(Tables.cellGeometryCounts);
-        this.meshTerrainJob.mcCellIndices.CopyFrom(Tables.cellIndices);
-        this.meshTerrainJob.mcCellVertexData.CopyFrom(Tables.cellVertexData);
-
-        // World Edit Mesh Job
-        this.worldEditMeshJob = new MeshTerrainJob()
-        {
-            vertexNormals = new NativeHashMap<Vector3, Vector3>(500000, Allocator.Persistent),
-            breakPoints = new NativeList<int2>(Allocator.Persistent),
-            voxelsMerged = new NativeArray<Voxel>(92416, Allocator.Persistent),
-            lightsMerged = new NativeArray<byte>(92416, Allocator.Persistent),
-            mcCornerPositions = new NativeArray<float3>(Tables.cornerPositions.Length, Allocator.Persistent),
-            mcCellClasses = new NativeArray<byte>(Tables.cellClasses.Length, Allocator.Persistent),
-            mcCellGeometryCounts = new NativeArray<int>(Tables.cellGeometryCounts.Length, Allocator.Persistent),
-            mcCellIndices = new NativeArray<int>(Tables.cellIndices.Length, Allocator.Persistent),
-            mcCellVertexData = new NativeArray<ushort>(Tables.cellVertexData.Length, Allocator.Persistent),
-            voxels00 = new NativeArray<Voxel>(65536, Allocator.Persistent),
-            lights00 = new NativeArray<byte>(65536, Allocator.Persistent),
-            voxels10 = new NativeArray<Voxel>(65536, Allocator.Persistent),
-            lights10 = new NativeArray<byte>(65536, Allocator.Persistent),
-            voxels20 = new NativeArray<Voxel>(65536, Allocator.Persistent),
-            lights20 = new NativeArray<byte>(65536, Allocator.Persistent),
-            voxels01 = new NativeArray<Voxel>(65536, Allocator.Persistent),
-            lights01 = new NativeArray<byte>(65536, Allocator.Persistent),
-            voxels11 = new NativeArray<Voxel>(65536, Allocator.Persistent),
-            lights11 = new NativeArray<byte>(65536, Allocator.Persistent),
-            voxels21 = new NativeArray<Voxel>(65536, Allocator.Persistent),
-            lights21 = new NativeArray<byte>(65536, Allocator.Persistent),
-            voxels02 = new NativeArray<Voxel>(65536, Allocator.Persistent),
-            lights02 = new NativeArray<byte>(65536, Allocator.Persistent),
-            voxels12 = new NativeArray<Voxel>(65536, Allocator.Persistent),
-            lights12 = new NativeArray<byte>(65536, Allocator.Persistent),
-            voxels22 = new NativeArray<Voxel>(65536, Allocator.Persistent),
-            lights22 = new NativeArray<byte>(65536, Allocator.Persistent),
-            vertices = new NativeList<Vector3>(Allocator.Persistent),
-            normals = new NativeList<Vector3>(Allocator.Persistent),
-            indices = new NativeList<int>(Allocator.Persistent),
-            lights = new NativeList<Vector2>(Allocator.Persistent),
-            mats1234 = new NativeList<Vector4>(Allocator.Persistent),
-            mats5678 = new NativeList<Vector4>(Allocator.Persistent),
-            weights1234 = new NativeList<Vector4>(Allocator.Persistent),
-            weights5678 = new NativeList<Vector4>(Allocator.Persistent),
-            cornerPositions = new NativeArray<float3>(8, Allocator.Persistent),
-            cornerVoxels = new NativeArray<Voxel>(8, Allocator.Persistent),
-            cornerLights = new NativeArray<float2>(8, Allocator.Persistent),
-            cornerIndices = new NativeArray<int>(8, Allocator.Persistent),
-            cellIndices = new NativeList<int>(Allocator.Persistent),
-            mappedIndices = new NativeList<ushort>(Allocator.Persistent)
-        };
-
-        this.worldEditMeshJob.mcCornerPositions.CopyFrom(Tables.cornerPositions);
-        this.worldEditMeshJob.mcCellClasses.CopyFrom(Tables.cellClasses);
-        this.worldEditMeshJob.mcCellGeometryCounts.CopyFrom(Tables.cellGeometryCounts);
-        this.worldEditMeshJob.mcCellIndices.CopyFrom(Tables.cellIndices);
-        this.worldEditMeshJob.mcCellVertexData.CopyFrom(Tables.cellVertexData);
-    }
-
-    //
-    // Clean Up (Might need to delete Meshes on Scene Exit, check that!)
-    //
 
     private void DisposeJobs()
     {
@@ -1674,40 +1723,10 @@ public class World : MonoBehaviour
     // Player Information
     //
 
-    private void UpdatePlayerChunkPosition()
-    {
-        this.playerChunkPosition = this.WorldToChunkPosition(this.playerWorldPosition.position);
-        this.didPlayerEnterChunk = (this.playerChunkPosition != this.playerChunkPositionLast);
-
-        if (this.didPlayerEnterChunk)
-        {
-            bool preventEntering = false;
-            if (this.playerChunkPositionLast.x != 2147483647)
-            {
-                if (!this.chunkObjects.ContainsKey(this.playerChunkPosition))
-                {
-                    preventEntering = true;
-                }
-                else
-                {
-                    if (!this.chunkObjects[this.playerChunkPosition].IsActive())
-                    {
-                        this.chunkObjects[this.playerChunkPosition].Activate();
-                    }
-                }
-            }
-
-            if (preventEntering)
-            {
-                this.playerChunkPosition = this.playerChunkPositionLast;
-                this.playerGameObject.GetComponent<PlayerController>().Stop();
-                this.playerGameObject.transform.position = this.playerWorldPositionLast;
-                this.didPlayerEnterChunk = false;
-            }
-        }
-    }
-
-    private void UpdatePlayerChunkPositionLast()
+    /// <summary>
+    /// Updates playerChunkPositionLast and playerWorldPositionLast
+    /// </summary>
+    private void UpdatePlayerPositionLast()
     {
         this.playerChunkPositionLast = this.playerChunkPosition;
         this.playerWorldPositionLast = this.playerWorldPosition.position;
