@@ -83,6 +83,9 @@ public class ChunkObject
 
     public void SetCollider(int index, Vector3[] vertices, int[] indices)
     {
+        //System.Diagnostics.Stopwatch stopwatch = new System.Diagnostics.Stopwatch();
+        //stopwatch.Start();
+
         this.colliderMeshes[index].Clear();
         this.colliderMeshes[index].SetVertices(vertices);
         this.colliderMeshes[index].SetIndices(indices, MeshTopology.Triangles, 0);
@@ -92,6 +95,9 @@ public class ChunkObject
             this.colliderObjects[index].GetComponent<MeshCollider>().sharedMesh = this.colliderMeshes[index];
             this.colliderObjects[index].SetActive(true);
         }
+
+        //stopwatch.Stop();
+        //Debug.Log("setting shared mesh: " + stopwatch.ElapsedMilliseconds);
     }
 
     public void Destroy()

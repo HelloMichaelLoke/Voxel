@@ -80,6 +80,8 @@ public class World : MonoBehaviour
     private List<Vector2Int> chunkLoadingOrder = new List<Vector2Int>();
 
     // Diagnostics
+    private System.Diagnostics.Stopwatch unloadStopwatch = new System.Diagnostics.Stopwatch();
+
     private System.Diagnostics.Stopwatch stopwatch = new System.Diagnostics.Stopwatch();
 
     private bool worldEditQueueEmpty = true;
@@ -457,9 +459,8 @@ public class World : MonoBehaviour
             return;
         }
 
-        this.startStopwatch();
-
-        if (this.chunksToDestroy.Count > 0)
+        this.unloadStopwatch.Restart();
+        while (this.chunksToDestroy.Count > 0 && unloadStopwatch.ElapsedMilliseconds < 1)
         {
             Vector2Int chunkPosition = this.chunksToDestroy.Dequeue();
 
@@ -471,7 +472,8 @@ public class World : MonoBehaviour
             this.chunks.Remove(chunkPosition);
         }
 
-        if (this.chunksToDeactivate.Count > 0)
+        this.unloadStopwatch.Restart();
+        while (this.chunksToDeactivate.Count > 0 && unloadStopwatch.ElapsedMilliseconds < 1)
         {
             Vector2Int chunkPosition = this.chunksToDeactivate.Dequeue();
             this.chunkObjects[chunkPosition].Deactivate();
@@ -514,7 +516,22 @@ public class World : MonoBehaviour
 
             if (this.chunks.ContainsKey(chunkPosition))
             {
-                this.generateLightsQueue.Enqueue(chunkPosition);
+                if (!this.chunks[chunkPosition].hasLights)
+                {
+                    this.generateLightsQueue.Enqueue(chunkPosition);
+                }
+                else if (!this.chunks[chunkPosition].hasObjects)
+                {
+                    this.generateMeshQueue.Enqueue(chunkPosition);
+                }
+                else if (this.chunks[chunkPosition].hasObjects)
+                {
+                    if (this.IsInChunkDistance(chunkPosition) && !this.chunkObjects[chunkPosition].IsActive())
+                    {
+                        this.chunkObjects[chunkPosition].Activate();
+                    }
+                }
+
                 return;
             }
 
@@ -618,7 +635,16 @@ public class World : MonoBehaviour
         }
     }
 
+    /// <summary>
+    /// Schedules and Completes Mesh Jobs
+    /// </summary>
     private void GenerateMeshes()
+    {
+        this.GenerateMeshesSchedule();
+        this.GenerateMeshesComplete();
+    }
+
+    private void GenerateMeshesSchedule()
     {
         if (this.meshTerrainJobDone && this.generateMeshQueue.Count > 0)
         {
@@ -712,7 +738,10 @@ public class World : MonoBehaviour
                 this.meshTerrainJobDone = false;
             }
         }
+    }
 
+    private void GenerateMeshesComplete()
+    {
         if (!this.meshTerrainJobDone && this.meshTerrainJobHandle.IsCompleted)
         {
             this.meshTerrainJobHandle.Complete();
@@ -733,6 +762,7 @@ public class World : MonoBehaviour
                 this.meshTerrainJob.lights.AsArray()
             );
 
+            this.startStopwatch();
             for (int i = 0; i < 16; i++)
             {
                 int startPositionVertices = this.meshTerrainJob.breakPoints[i].x;
@@ -779,12 +809,16 @@ public class World : MonoBehaviour
 
                 chunkObject.SetCollider(i, colliderVertices, colliderIndices);
             }
+            this.stopStopwatch("Apply colliders", 1);
 
             this.chunkObjects.Add(chunkPosition, chunkObject);
             this.chunks[chunkPosition].hasObjects = true;
         }
     }
 
+    /// <summary>
+    /// Handles terrain sculpting.
+    /// </summary>
     private void UpdateWorldEdit()
     {
         if (!this.isWorldEditBlocked && this.lightRemovalJobDone && this.worldEditQueue.Count > 0)
