@@ -15,11 +15,10 @@ public class ChunkObject
 
     public ChunkObject(Vector2Int chunkPosition, Material material)
     {
+        this.isActive = true;
         this.wrapperObject = new GameObject();
         this.wrapperObject.transform.position = new Vector3(chunkPosition.x * 16.0f, 0.0f, chunkPosition.y * 16.0f);
         this.wrapperObject.name = "Chunk Wrapper (" + chunkPosition.x.ToString() + ", " + chunkPosition.y.ToString() + ")";
-
-        this.isActive = true;
         this.rendererObject = new GameObject();
         this.rendererObject.transform.SetParent(this.wrapperObject.transform);
         this.rendererObject.name = "Chunk Renderer (" + chunkPosition.x.ToString() + ", " + chunkPosition.y.ToString() + ")";
@@ -43,7 +42,7 @@ public class ChunkObject
             this.colliderObjects[i].layer = 8;
             this.colliderObjects[i].name = "Chunk Collider (" + chunkPosition.x.ToString() + ", " + i + ", " + chunkPosition.y.ToString() + ")";
             //this.colliderObjects[i].transform.position = new Vector3(chunkPosition.x * 16.0f, i * 16.0f, chunkPosition.y * 16.0f);
-            this.colliderObjects[i].transform.position = new Vector3(0.0f, i * 16.0f, 0.0f);
+            this.colliderObjects[i].transform.localPosition = new Vector3(0.0f, i * 16.0f, 0.0f);
             this.colliderObjects[i].SetActive(false);
             this.colliderObjects[i].AddComponent<MeshCollider>();
             this.colliderMeshes[i] = new Mesh();
