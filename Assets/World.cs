@@ -37,19 +37,19 @@ public class World : MonoBehaviour
     private Dictionary<Vector2Int, ChunkObject> chunkObjects = new Dictionary<Vector2Int, ChunkObject>();
 
     // Generate Voxels Job
-    private int generateVoxelsJobCount = 32;
+    private int generateVoxelsJobCount = 3;
     private GenerateVoxelsJob[] generateVoxelsJob;
     private JobHandle[] generateVoxelsJobHandle;
     private bool[] generateVoxelsJobDone;
 
     // Generate Lights Job
-    private int generateLightsJobCount = 32;
+    private int generateLightsJobCount = 3;
     private GenerateLightsJob[] generateLightsJob;
     private JobHandle[] generateLightsJobHandle;
     private bool[] generateLightsJobDone;
 
     // Generate Mesh Job
-    private int generateMeshJobCount = 16;
+    private int generateMeshJobCount = 4;
     private GenerateMeshJob[] generateMeshJob;
     private JobHandle[] generateMeshJobHandle;
     private bool[] generateMeshJobDone;
@@ -548,7 +548,27 @@ public class World : MonoBehaviour
 
         while (this.chunksToLoad.Count > 0)
         {
-            this.generateVoxelsQueue.Enqueue(this.chunksToLoad.Dequeue());
+            Vector2Int chunkPosition = this.chunksToLoad.Dequeue();
+
+            if (this.IsInChunkDistance(chunkPosition, 2))
+            {
+                this.generateVoxelsQueue.Enqueue(chunkPosition);
+            }
+
+            if (this.IsInChunkDistance(chunkPosition, 1))
+            {
+                this.generateLightsQueue.Enqueue(chunkPosition);
+            }
+            
+            if (this.IsInChunkDistance(chunkPosition))
+            {
+                this.generateMeshQueue.Enqueue(chunkPosition);
+            }
+
+            if (this.IsInChunkDistance(chunkPosition))
+            {
+                this.chunksToActivate.Enqueue(chunkPosition);
+            }
         }
 
         this.isLoadChunksPending = false;
@@ -565,9 +585,18 @@ public class World : MonoBehaviour
             return;
         }
 
-        if (this.chunksToActivate.Count > 0)
+        Vector2Int chunkPosition;
+        while (this.chunksToActivate.Count > 0)
         {
-            this.chunkObjects[this.chunksToActivate.Dequeue()].Activate();
+            chunkPosition = this.chunksToActivate.Dequeue();
+            if (this.chunkObjects.ContainsKey(chunkPosition))
+            {
+                if (!this.chunkObjects[chunkPosition].IsActive())
+                {
+                    this.chunkObjects[chunkPosition].Activate();
+                    break;
+                }
+            }
         }
     }
 
@@ -597,28 +626,9 @@ public class World : MonoBehaviour
         {
             if (this.generateVoxelsJobDone[i] && this.generateVoxelsQueue.Count > 0)
             {
-                Vector2Int chunkPosition;
-
                 while (this.generateVoxelsQueue.Count > 0 && this.chunks.ContainsKey(this.generateVoxelsQueue.Peek()))
                 {
-                    chunkPosition = this.generateVoxelsQueue.Dequeue();
-
-                    if (!this.chunks[chunkPosition].hasLights && this.IsInChunkDistance(chunkPosition, 1))
-                    {
-                        this.generateLightsQueue.Enqueue(chunkPosition);
-                        continue;
-                    }
-
-                    if (!this.chunks[chunkPosition].hasObjects && this.IsInChunkDistance(chunkPosition))
-                    {
-                        this.generateMeshQueue.Enqueue(chunkPosition);
-                        continue;
-                    }
-
-                    if (!this.chunkObjects[chunkPosition].IsActive() && this.IsInChunkDistance(chunkPosition))
-                    {
-                        this.chunksToActivate.Enqueue(chunkPosition);
-                    }
+                    this.generateVoxelsQueue.Dequeue();
                 }
 
                 if (this.generateVoxelsQueue.Count == 0)
@@ -626,7 +636,7 @@ public class World : MonoBehaviour
                     return;
                 }
 
-                chunkPosition = this.generateVoxelsQueue.Dequeue();
+                Vector2Int chunkPosition = this.generateVoxelsQueue.Dequeue();
 
                 this.generateVoxelsJob[i].chunkPosition = new int2(chunkPosition.x, chunkPosition.y);
                 this.generateVoxelsJobHandle[i] = this.generateVoxelsJob[i].Schedule();
@@ -650,11 +660,6 @@ public class World : MonoBehaviour
 
                 Vector2Int chunkPosition = new Vector2Int(this.generateVoxelsJob[i].chunkPosition.x, this.generateVoxelsJob[i].chunkPosition.y);
                 this.chunks.Add(chunkPosition, chunk);
-
-                if (this.IsInChunkDistance(chunkPosition, 1))
-                {
-                    this.generateLightsQueue.Enqueue(chunkPosition);
-                }
             }
         }
     }
@@ -685,12 +690,32 @@ public class World : MonoBehaviour
 
             if (this.generateLightsJobDone[i])
             {
+                Vector2Int chunkPosition;
+
+                while (this.generateLightsQueue.Count > 0)
+                {
+                    chunkPosition = this.generateLightsQueue.Peek();
+                    if (!this.chunks.ContainsKey(chunkPosition))
+                    {
+                        return;
+                    }
+
+                    if (this.chunks[chunkPosition].hasLights)
+                    {
+                        this.generateLightsQueue.Dequeue();
+                    }
+                    else
+                    {
+                        break;
+                    }
+                }
+
                 if (this.generateLightsQueue.Count == 0)
                 {
                     return;
                 }
 
-                Vector2Int chunkPosition = this.generateLightsQueue.Peek();
+                chunkPosition = this.generateLightsQueue.Peek();
 
                 bool neighborsDone = true;
                 Vector2Int neighborPosition = new Vector2Int(0, 0);
@@ -748,11 +773,6 @@ public class World : MonoBehaviour
                 Vector2Int chunkPosition = new Vector2Int(this.generateLightsJob[i].chunkPosition.x, this.generateLightsJob[i].chunkPosition.y);
                 this.chunks[chunkPosition].SetLightsFromNative(this.generateLightsJob[i].lights);
                 this.chunks[chunkPosition].hasLights = true;
-
-                if (this.IsInChunkDistance(chunkPosition))
-                {
-                    this.generateMeshQueue.Enqueue(chunkPosition);
-                }
             }
         }
     }
@@ -783,7 +803,42 @@ public class World : MonoBehaviour
 
             if (this.generateMeshJobDone[i])
             {
-                Vector2Int chunkPosition = this.generateMeshQueue.Peek();
+                Vector2Int chunkPosition;
+
+                while (this.generateMeshQueue.Count > 0)
+                {
+                    chunkPosition = this.generateMeshQueue.Peek();
+
+                    if (this.chunks.ContainsKey(chunkPosition))
+                    {
+                        if (this.chunks[chunkPosition].hasObjects)
+                        {
+                            this.generateMeshQueue.Dequeue();
+                        }
+                        else
+                        {
+                            if (this.chunks[chunkPosition].hasLights)
+                            {
+                                break;
+                            }
+                            else
+                            {
+                                return;
+                            }
+                        }
+                    }
+                    else
+                    {
+                        return;
+                    }
+                }
+
+                if (this.generateMeshQueue.Count == 0)
+                {
+                    return;
+                }
+
+                chunkPosition = this.generateMeshQueue.Peek();
 
                 bool neighborsDone = true;
                 Vector2Int neighborPosition = new Vector2Int(0, 0);
