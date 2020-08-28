@@ -81,7 +81,14 @@ public class ChunkObject
         this.rendererMesh.RecalculateBounds();
     }
 
-    public void SetCollider(int index, Vector3[] vertices, int[] indices)
+    /// <summary>
+    /// Sets the collider mesh based on the Y index (0-15) but DOES NOT apply it to the MeshCollider component yet,
+    /// because it needs threaded baking first.
+    /// </summary>
+    /// <param name="index">Y array position of the collider mesh.</param>
+    /// <param name="vertices">Array of mesh vertices.</param>
+    /// <param name="indices">Array of mesh indices.</param>
+    public void SetColliderMesh(int index, Vector3[] vertices, int[] indices)
     {
         //System.Diagnostics.Stopwatch stopwatch = new System.Diagnostics.Stopwatch();
         //stopwatch.Start();
@@ -89,15 +96,24 @@ public class ChunkObject
         this.colliderMeshes[index].Clear();
         this.colliderMeshes[index].SetVertices(vertices);
         this.colliderMeshes[index].SetIndices(indices, MeshTopology.Triangles, 0);
-        this.colliderMeshes[index].Optimize();
-        if (this.colliderMeshes[index].vertexCount > 0)
-        {
-            this.colliderObjects[index].GetComponent<MeshCollider>().sharedMesh = this.colliderMeshes[index];
-            this.colliderObjects[index].SetActive(true);
-        }
 
         //stopwatch.Stop();
         //Debug.Log("setting shared mesh: " + stopwatch.ElapsedMilliseconds);
+    }
+
+    /// <summary>
+    /// Sets the MeshCollider.sharedMesh to the ALREADY Physics.BakeMesh()'d collider mesh.
+    /// </summary>
+    /// <param name="index">Y array position (0-15) of the collider inside the chunk.</param>
+    public void SetCollider(int index)
+    {
+        this.colliderObjects[index].GetComponent<MeshCollider>().sharedMesh = this.colliderMeshes[index];
+        this.colliderObjects[index].SetActive(true);
+    }
+
+    public int GetMeshInstanceID(int index)
+    {
+        return this.colliderMeshes[index].GetInstanceID();
     }
 
     public void Destroy()

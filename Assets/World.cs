@@ -37,22 +37,27 @@ public class World : MonoBehaviour
     private Dictionary<Vector2Int, ChunkObject> chunkObjects = new Dictionary<Vector2Int, ChunkObject>();
 
     // Generate Voxels Job
-    private int generateVoxelsJobCount = 3;
+    private int generateVoxelsJobCount = 4;
     private GenerateVoxelsJob[] generateVoxelsJob;
     private JobHandle[] generateVoxelsJobHandle;
     private bool[] generateVoxelsJobDone;
 
     // Generate Lights Job
-    private int generateLightsJobCount = 3;
+    private int generateLightsJobCount = 4;
     private GenerateLightsJob[] generateLightsJob;
     private JobHandle[] generateLightsJobHandle;
     private bool[] generateLightsJobDone;
 
     // Generate Mesh Job
-    private int generateMeshJobCount = 4;
+    private int generateMeshJobCount = 5;
     private GenerateMeshJob[] generateMeshJob;
     private JobHandle[] generateMeshJobHandle;
     private bool[] generateMeshJobDone;
+
+    // Bake Physics Mesh Job
+    private BakePhysicsMeshJob bakePhysicsMeshJob;
+    private JobHandle bakePhysicsMeshJobHandle;
+    private bool bakePhysicsMeshJobDone;
 
     // World Edit Mesh Job
     private GenerateMeshJob worldEditMeshJob;
@@ -75,6 +80,7 @@ public class World : MonoBehaviour
     private Queue<Vector2Int> generateVoxelsQueue = new Queue<Vector2Int>();
     private Queue<Vector2Int> generateLightsQueue = new Queue<Vector2Int>();
     private Queue<Vector2Int> generateMeshQueue = new Queue<Vector2Int>();
+    private Queue<BakePhysicsMeshData> bakePhysicsMeshQueue = new Queue<BakePhysicsMeshData>();
 
     private Queue<Vector2Int> chunksToDestroy = new Queue<Vector2Int>();
     private Queue<Vector2Int> chunksToDeactivate = new Queue<Vector2Int>();
@@ -101,21 +107,24 @@ public class World : MonoBehaviour
 
     private void Update()
     {
+        this.startStopwatch();
+
         this.UpdatePlayerPosition();
         this.UpdateChunkLoadingOrigin();
         this.UpdateChunkQueue();
         this.UnloadChunks();
         this.LoadChunks();
         this.ActivateChunks();
-        this.GenerateVoxels();
-        this.GenerateLights();
-        this.GenerateMeshes();
+
+        this.GenerateVoxels(); // 3-12ms
+        this.GenerateLights(); // 2 - 32ms sometimes.. (most of the time < 1ms)
+        this.GenerateMeshes(); // 5 - 30ms
+        this.BakePhysicsMeshes(); // 2 - 22ms sometimes (mostly < 1ms)
+
         this.UpdateWorldEdit();
         this.UpdatePlayerPositionLast();
 
-        Debug.Log("v: " + this.generateVoxelsQueue.Count);
-        Debug.Log("l: " + this.generateLightsQueue.Count);
-        Debug.Log("m: " + this.generateMeshQueue.Count);
+        this.stopStopwatch("World Update", 20);
     }
 
     private void OnApplicationQuit()
@@ -306,6 +315,14 @@ public class World : MonoBehaviour
             this.generateMeshJob[i].mcCellVertexData.CopyFrom(Tables.cellVertexData);
         }
 
+        // Bake Physics Mesh Job
+        this.bakePhysicsMeshJobDone = true;
+        this.bakePhysicsMeshJobHandle = new JobHandle();
+        this.bakePhysicsMeshJob = new BakePhysicsMeshJob()
+        {
+            bakeMeshData = new NativeList<BakePhysicsMeshData>(Allocator.Persistent)
+        };
+
         // Light Removal Job
         this.lightRemovalJob = new LightRemovalJob()
         {
@@ -469,6 +486,11 @@ public class World : MonoBehaviour
             {
                 return;
             }
+        }
+
+        if (this.bakePhysicsMeshQueue.Count > 0 || !this.bakePhysicsMeshJobDone)
+        {
+            return;
         }
 
         this.chunkLoadingOrigin = this.chunkLoadingOriginNew;
@@ -987,13 +1009,52 @@ public class World : MonoBehaviour
                         colliderIndices[j] -= colliderIndicesOffset;
                     }
 
-                    chunkObject.SetCollider(y, colliderVertices, colliderIndices);
+                    chunkObject.SetColliderMesh(y, colliderVertices, colliderIndices);
+                    BakePhysicsMeshData bakePhysicsMeshData = new BakePhysicsMeshData(chunkPosition, y, chunkObject.GetMeshInstanceID(y));
+                    this.bakePhysicsMeshQueue.Enqueue(bakePhysicsMeshData);
                 }
 
                 this.chunkObjects.Add(chunkPosition, chunkObject);
                 this.chunks[chunkPosition].hasObjects = true;
+            }
+        }
+    }
 
-                return;
+    /// <summary>
+    /// Schedules and completes physics mesh baking.
+    /// </summary>
+    private void BakePhysicsMeshes()
+    {
+        this.BakePhysicsMeshesSchedule();
+        this.BakePhysicsMeshesComplete();
+    }
+
+    private void BakePhysicsMeshesSchedule()
+    {
+        if (this.bakePhysicsMeshJobDone && this.bakePhysicsMeshQueue.Count > 0)
+        {
+            this.bakePhysicsMeshJob.bakeMeshData.Clear();
+
+            while (this.bakePhysicsMeshQueue.Count > 0)
+            {
+                this.bakePhysicsMeshJob.bakeMeshData.Add(this.bakePhysicsMeshQueue.Dequeue());
+            }
+
+            this.bakePhysicsMeshJobHandle = this.bakePhysicsMeshJob.Schedule();
+            this.bakePhysicsMeshJobDone = false;
+        }
+    }
+
+    private void BakePhysicsMeshesComplete()
+    {
+        if (!this.bakePhysicsMeshJobDone && this.bakePhysicsMeshJobHandle.IsCompleted)
+        {
+            this.bakePhysicsMeshJobDone = true;
+            this.bakePhysicsMeshJobHandle.Complete();
+
+            foreach (BakePhysicsMeshData data in this.bakePhysicsMeshJob.bakeMeshData)
+            {
+                this.chunkObjects[data.chunkPosition].SetCollider(data.colliderIndex);
             }
         }
     }
@@ -1360,7 +1421,7 @@ public class World : MonoBehaviour
                     colliderIndices[j] -= colliderIndicesOffset;
                 }
 
-                this.chunkObjects[chunkPosition].SetCollider(i, colliderVertices, colliderIndices);
+                this.chunkObjects[chunkPosition].SetColliderMesh(i, colliderVertices, colliderIndices);
             }
 
             Debug.Log("done");
@@ -1459,6 +1520,10 @@ public class World : MonoBehaviour
             this.generateMeshJob[i].voxels22.Dispose();
             this.generateMeshJob[i].lights22.Dispose();
         }
+
+        // Bake Physics Mesh Job
+        if (!this.bakePhysicsMeshJobDone) this.bakePhysicsMeshJobHandle.Complete();
+        this.bakePhysicsMeshJob.bakeMeshData.Dispose();
 
         //
         // Light Update Job
