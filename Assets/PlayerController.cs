@@ -52,11 +52,11 @@ public class PlayerController : MonoBehaviour
 
     private void Update()
     {
-        if (Cursor.visible)
-        {
-            this.characterController.Move(this.velocity * Time.deltaTime);
-            return;
-        }
+        //if (Cursor.visible)
+        //{
+        //    this.characterController.Move(this.velocity * Time.deltaTime);
+        //    return;
+        //}
 
         this.ToggleCrouching();
         this.ToggleRunning();

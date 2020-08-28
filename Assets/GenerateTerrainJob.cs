@@ -9,6 +9,7 @@ using Unity.Mathematics;
 [BurstCompile(CompileSynchronously = true)]
 public struct GenerateTerrainJob : IJob
 {
+    public NativeArray<float> tempHeights;
     public NativeArray<float> heights;
     public NativeArray<Voxel> voxels;
 
@@ -24,11 +25,33 @@ public struct GenerateTerrainJob : IJob
         //
 
         int i = 0;
-        for (int z = startPosition.z; z <= endPosition.z; z++)
+        for (int z = startPosition.z - 1; z <= endPosition.z + 1; z++)
         {
-            for (int x = startPosition.x; x <= endPosition.x; x++)
+            for (int x = startPosition.x - 1; x <= endPosition.x + 1; x++)
             {
-                heights[i] = GetHeightA(new float2(x, z));
+                tempHeights[i] = GetHeight1(new float2(x, z));
+                i++;
+            }
+        }
+
+        i = 0;
+        for (int z = 1; z <= 16; z++)
+        {
+            for (int x = 1; x <= 16; x++)
+            {
+                int index = x + z * 18;
+                float finalHeight = 0.0f;
+                finalHeight += tempHeights[index - 19];
+                finalHeight += tempHeights[index - 18];
+                finalHeight += tempHeights[index + 19];
+                finalHeight += tempHeights[index - 1];
+                finalHeight += tempHeights[index];
+                finalHeight += tempHeights[index + 1];
+                finalHeight += tempHeights[index - 19];
+                finalHeight += tempHeights[index + 18];
+                finalHeight += tempHeights[index + 19];
+                finalHeight /= 9.0f;
+                heights[i] = finalHeight;
                 i++;
             }
         }
@@ -55,7 +78,7 @@ public struct GenerateTerrainJob : IJob
                     float temperature = this.GetTemperature(positionXZ);
                     float rainfall = this.GetRainfall(positionXZ);
 
-                    if (y < 75.0f || y < height - 10.0f)
+                    if (y < 60.0f || y < height - 10.0f)
                     {
                         float caveNoise = GetCaves(new float3(x, y, z));
 
@@ -173,7 +196,7 @@ public struct GenerateTerrainJob : IJob
                                 }
                             }
 
-                            if (height < 120.0f)
+                            if (height < 80.0f)
                             {
                                 material = 4;
                             }
@@ -300,14 +323,14 @@ public struct GenerateTerrainJob : IJob
 
     private float GetHeightA(float2 position)
     {
-        float2 pos = new float2(position.x + 15000.0f, position.y - 20000.0f) * 0.0010f;
+        float2 pos = new float2(position.x + 15000.0f, position.y - 20000.0f) * 0.001f;
 
         float2 q = new float2(noise.snoise(pos), noise.snoise(pos + new float2(-12.700f, 11.820f)));
         float2 r = pos + 4.0f * q;
         float2 s = new float2(noise.snoise(r + new float2(5.060f, -8.830f)), noise.snoise(r + new float2(-0.270f, -0.180f)));
         float2 t = pos + 4.0f * s;
 
-        float val = octaves(pos, 16.0f);
+        float val = octaves(pos * 0.1f, 16.0f);
         float val2 = octaves(pos * 10.0f, 8.0f);
         val = 0.8f * val + 0.05f * noise.snoise(t * 0.05f) + 0.15f * val2;
 
@@ -359,5 +382,110 @@ public struct GenerateTerrainJob : IJob
     public float3 rand3(float2 pos)
     {
         return -1.0f + 2.0f * math.frac(math.sin(new float3(math.dot(pos, new float2(127.1f, 311.7f)), math.dot(pos, new float2(269.5f, 183.3f)), math.dot(pos, new float2(532.1f, 66.3f)))) * 43758.5453f);
+    }
+
+    ////////////////////////////////////////////////////////////////////
+    /// NOISE //////////////////////////////////////////////////////////
+    ////////////////////////////////////////////////////////////////////
+    
+    private float GetHeight1(float2 position)
+    {
+        position += new float2(1000.0f, 1000.0f);
+        position *= 0.001f;
+
+        // NOISE 1
+        float frequencyNoise1 = 0.5f;
+        float noise1 = onoise(position * frequencyNoise1, 8);
+
+        // DOMAIN WARPING 1
+        float2 p = position * 0.005f;
+        float2 q = new float2(fbm(p), fbm(p + new float2(5.2f, 1.3f)));
+        float2 r = new float2(fbm(p + 2.0f * q + new float2(1.7f, 9.2f)), fbm(p + 2.0f * q + new float2(8.3f, 2.8f)));
+        float dmNoise1 = snoise(p + 2.0f * r);
+
+        // DOMAIN WARPING 2
+        p = position * 0.02f;
+        q = new float2(fbm(p), fbm(p + new float2(1.2f, 1.3f)));
+        r = new float2(fbm(p + 2.0f * q + new float2(2.7f, 3.2f)), fbm(p + 2.0f * q + new float2(-2.3f, 6.8f)));
+        float dmNoise2 = snoise(p + 2.0f * r);
+
+        // DOMAIN WARPING 3
+        p = position * 0.08f;
+        q = new float2(fbm(p), fbm(p + new float2(1.2f, 1.3f)));
+        r = new float2(fbm(p + 2.0f * q + new float2(2.7f, 3.2f)), fbm(p + 2.0f * q + new float2(-2.3f, 6.8f)));
+        float dmNoise3 = snoise(p + 2.0f * r);
+
+        // FINAL HEIGHT
+        float mixedNoises = 0.1f * noise1 + 0.45f * dmNoise1 + 0.35f * dmNoise2 + 0.1f * dmNoise3;
+        float height = 0.5f * mixedNoises + 0.5f;
+
+        return 30.0f + height * 100.0f;
+    }
+
+    ////////////////////////////////////////////////////////////////////
+    /// FUNCTIONS //////////////////////////////////////////////////////
+    ////////////////////////////////////////////////////////////////////
+
+    private float3 permute(float3 h)
+    {
+        float3 value = (h * (h * 34.0f + 2.0f));
+        value.x = value.x % 289.0f;
+        value.y = value.y % 289.0f;
+        value.z = value.z % 289.0f;
+        return value;
+    }
+
+    private float grad(float hash, float2 vRelative)
+    {
+        float2 gradient = new float2(math.sin(hash), math.cos(hash));
+        return math.dot(vRelative, gradient);
+    }
+
+    private float snoise(float2 v)
+    {
+        float4 C = new float4(0.366025403784439f, -0.211324865405187f, 1.0f - 2.0f * 0.211324865405187f, 1.0f / 0.010080202759123733f);
+        float skew = (v.x + v.y) * C.x;
+        float2 vSkew = v + skew;
+        float2 vSkewBase = math.floor(vSkew);
+        float2 vSkewRelative = vSkew - vSkewBase;
+
+        float2 p = vSkewRelative.y > vSkewRelative.x ? new float2(0.0f, 1.0f) : new float2(1.0f, 0.0f);
+        float2 vertex1 = vSkewBase;
+        float2 vertex2 = vSkewBase + p;
+        float2 vertex3 = vSkewBase + new float2(1.0f, 1.0f);
+        float3 hashes = permute(permute(new float3(vertex1.x, vertex2.x, vertex3.x)) + new float3(vertex1.y, vertex2.y, vertex3.y));
+        hashes *= 6.283185307179586f / 289.0f;
+
+        float unskew = (vSkewRelative.x + vSkewRelative.y) * C.y;
+        float2 vRelative = vSkewRelative + unskew;
+        float2 vRelative2 = vRelative - p - C.yy;
+        float2 vRelative3 = vRelative - C.zz;
+
+        float3 kernels = math.max(new float3(0.0f), 0.5f - new float3(math.dot(vRelative, vRelative), math.dot(vRelative2, vRelative2), math.dot(vRelative3, vRelative3)));
+        kernels *= kernels; kernels *= kernels;
+        float3 grads = new float3(grad(hashes.x, vRelative), grad(hashes.y, vRelative2), grad(hashes.z, vRelative3));
+
+        return math.dot(kernels, grads) * C.w;
+    }
+
+    private float onoise(float2 position, int octaves)
+    {
+        float sum = 0.0f;
+        float frequency = 1.0f;
+        float amplitude = 1.0f;
+        float max = 0.0f;
+        for (int i = 0; i < octaves; i++)
+        {
+            sum += snoise(position * frequency) * amplitude;
+            max += amplitude;
+            amplitude *= 0.5f;
+            frequency *= 2.0f;
+        }
+        return sum / max;
+    }
+
+    private float fbm(float2 position)
+    {
+        return onoise(position, 16);
     }
 }

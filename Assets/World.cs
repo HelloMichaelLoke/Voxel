@@ -202,6 +202,7 @@ public class World : MonoBehaviour
         // Terrain Job
         this.generateTerrainJob.voxels = new NativeArray<Voxel>(65536, Allocator.Persistent);
         this.generateTerrainJob.heights = new NativeArray<float>(256, Allocator.Persistent);
+        this.generateTerrainJob.tempHeights = new NativeArray<float>(324, Allocator.Persistent);
 
         // Light Job
         this.sunLightJob.lights = new NativeArray<byte>(65536, Allocator.Persistent);
@@ -762,7 +763,6 @@ public class World : MonoBehaviour
                 this.meshTerrainJob.lights.AsArray()
             );
 
-            this.startStopwatch();
             for (int i = 0; i < 16; i++)
             {
                 int startPositionVertices = this.meshTerrainJob.breakPoints[i].x;
@@ -809,7 +809,6 @@ public class World : MonoBehaviour
 
                 chunkObject.SetCollider(i, colliderVertices, colliderIndices);
             }
-            this.stopStopwatch("Apply colliders", 1);
 
             this.chunkObjects.Add(chunkPosition, chunkObject);
             this.chunks[chunkPosition].hasObjects = true;
@@ -1215,6 +1214,7 @@ public class World : MonoBehaviour
 
         this.generateTerrainJob.voxels.Dispose();
         this.generateTerrainJob.heights.Dispose();
+        this.generateTerrainJob.tempHeights.Dispose();
 
         //
         // Sun Light Job
