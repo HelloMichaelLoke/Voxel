@@ -7,7 +7,7 @@ using Unity.Jobs;
 using Unity.Mathematics;
 
 [BurstCompile(CompileSynchronously = true)]
-public struct MeshTerrainJob : IJob
+public struct GenerateMeshJob : IJob
 {
     // Temporary Data
     public NativeArray<Voxel> voxelsMerged;

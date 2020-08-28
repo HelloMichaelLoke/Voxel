@@ -7,7 +7,7 @@ using Unity.Jobs;
 using Unity.Mathematics;
 
 [BurstCompile(CompileSynchronously = true)]
-public struct GenerateTerrainJob : IJob
+public struct GenerateVoxelsJob : IJob
 {
     public NativeArray<float> tempHeights;
     public NativeArray<float> heights;
@@ -397,26 +397,26 @@ public struct GenerateTerrainJob : IJob
         float frequencyNoise1 = 0.5f;
         float noise1 = onoise(position * frequencyNoise1, 8);
 
-        // DOMAIN WARPING 1
-        float2 p = position * 0.005f;
-        float2 q = new float2(fbm(p), fbm(p + new float2(5.2f, 1.3f)));
-        float2 r = new float2(fbm(p + 2.0f * q + new float2(1.7f, 9.2f)), fbm(p + 2.0f * q + new float2(8.3f, 2.8f)));
-        float dmNoise1 = snoise(p + 2.0f * r);
+        //// DOMAIN WARPING 1
+        //float2 p = position * 0.005f;
+        //float2 q = new float2(fbm(p), fbm(p + new float2(5.2f, 1.3f)));
+        //float2 r = new float2(fbm(p + 2.0f * q + new float2(1.7f, 9.2f)), fbm(p + 2.0f * q + new float2(8.3f, 2.8f)));
+        //float dmNoise1 = snoise(p + 2.0f * r);
 
-        // DOMAIN WARPING 2
-        p = position * 0.02f;
-        q = new float2(fbm(p), fbm(p + new float2(1.2f, 1.3f)));
-        r = new float2(fbm(p + 2.0f * q + new float2(2.7f, 3.2f)), fbm(p + 2.0f * q + new float2(-2.3f, 6.8f)));
-        float dmNoise2 = snoise(p + 2.0f * r);
+        //// DOMAIN WARPING 2
+        //p = position * 0.02f;
+        //q = new float2(fbm(p), fbm(p + new float2(1.2f, 1.3f)));
+        //r = new float2(fbm(p + 2.0f * q + new float2(2.7f, 3.2f)), fbm(p + 2.0f * q + new float2(-2.3f, 6.8f)));
+        //float dmNoise2 = snoise(p + 2.0f * r);
 
-        // DOMAIN WARPING 3
-        p = position * 0.08f;
-        q = new float2(fbm(p), fbm(p + new float2(1.2f, 1.3f)));
-        r = new float2(fbm(p + 2.0f * q + new float2(2.7f, 3.2f)), fbm(p + 2.0f * q + new float2(-2.3f, 6.8f)));
-        float dmNoise3 = snoise(p + 2.0f * r);
+        //// DOMAIN WARPING 3
+        //p = position * 0.08f;
+        //q = new float2(fbm(p), fbm(p + new float2(1.2f, 1.3f)));
+        //r = new float2(fbm(p + 2.0f * q + new float2(2.7f, 3.2f)), fbm(p + 2.0f * q + new float2(-2.3f, 6.8f)));
+        //float dmNoise3 = snoise(p + 2.0f * r);
 
         // FINAL HEIGHT
-        float mixedNoises = 0.1f * noise1 + 0.45f * dmNoise1 + 0.35f * dmNoise2 + 0.1f * dmNoise3;
+        float mixedNoises = noise1; // 0.1f * noise1 + 0.45f * dmNoise1 + 0.35f * dmNoise2 + 0.1f * dmNoise3;
         float height = 0.5f * mixedNoises + 0.5f;
 
         return 30.0f + height * 100.0f;

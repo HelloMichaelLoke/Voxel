@@ -7,7 +7,7 @@ using Unity.Jobs;
 using Unity.Mathematics;
 
 [BurstCompile(CompileSynchronously = true)]
-public struct SunLightJob : IJob
+public struct GenerateLightsJob : IJob
 {
     // Final light data output
     public NativeArray<byte> lights;
