@@ -265,10 +265,11 @@ public class World : MonoBehaviour
             this.generateMeshJobDone[i] = true;
             this.generateMeshJob[i] = new GenerateMeshJob()
             {
-                vertexNormals = new NativeHashMap<Vector3, Vector3>(500000, Allocator.Persistent),
                 breakPoints = new NativeList<int2>(Allocator.Persistent),
                 voxelsMerged = new NativeArray<Voxel>(92416, Allocator.Persistent),
                 lightsMerged = new NativeArray<byte>(92416, Allocator.Persistent),
+                voxelGradients = new NativeArray<float3>(73406, Allocator.Persistent),
+                voxelLights = new NativeArray<float2>(73406, Allocator.Persistent),
                 mcCornerPositions = new NativeArray<float3>(Tables.cornerPositions.Length, Allocator.Persistent),
                 mcCellClasses = new NativeArray<byte>(Tables.cellClasses.Length, Allocator.Persistent),
                 mcCellGeometryCounts = new NativeArray<int>(Tables.cellGeometryCounts.Length, Allocator.Persistent),
@@ -303,7 +304,7 @@ public class World : MonoBehaviour
                 cornerPositions = new NativeArray<float3>(8, Allocator.Persistent),
                 cornerVoxels = new NativeArray<Voxel>(8, Allocator.Persistent),
                 cornerLights = new NativeArray<float2>(8, Allocator.Persistent),
-                cornerIndices = new NativeArray<int>(8, Allocator.Persistent),
+                cornerGradients = new NativeArray<float3>(8, Allocator.Persistent),
                 cellIndices = new NativeList<int>(Allocator.Persistent),
                 mappedIndices = new NativeList<ushort>(Allocator.Persistent)
             };
@@ -356,10 +357,11 @@ public class World : MonoBehaviour
         // World Edit Mesh Job
         this.worldEditMeshJob = new GenerateMeshJob()
         {
-            vertexNormals = new NativeHashMap<Vector3, Vector3>(500000, Allocator.Persistent),
             breakPoints = new NativeList<int2>(Allocator.Persistent),
             voxelsMerged = new NativeArray<Voxel>(92416, Allocator.Persistent),
             lightsMerged = new NativeArray<byte>(92416, Allocator.Persistent),
+            voxelGradients = new NativeArray<float3>(73406, Allocator.Persistent),
+            voxelLights = new NativeArray<float2>(73406, Allocator.Persistent),
             mcCornerPositions = new NativeArray<float3>(Tables.cornerPositions.Length, Allocator.Persistent),
             mcCellClasses = new NativeArray<byte>(Tables.cellClasses.Length, Allocator.Persistent),
             mcCellGeometryCounts = new NativeArray<int>(Tables.cellGeometryCounts.Length, Allocator.Persistent),
@@ -394,7 +396,7 @@ public class World : MonoBehaviour
             cornerPositions = new NativeArray<float3>(8, Allocator.Persistent),
             cornerVoxels = new NativeArray<Voxel>(8, Allocator.Persistent),
             cornerLights = new NativeArray<float2>(8, Allocator.Persistent),
-            cornerIndices = new NativeArray<int>(8, Allocator.Persistent),
+            cornerGradients = new NativeArray<float3>(8, Allocator.Persistent),
             cellIndices = new NativeList<int>(Allocator.Persistent),
             mappedIndices = new NativeList<ushort>(Allocator.Persistent)
         };
@@ -1384,10 +1386,11 @@ public class World : MonoBehaviour
         for (int i = 0; i < this.generateMeshJobCount; i++)
         {
             if (!this.generateMeshJobDone[i]) this.generateMeshJobHandle[i].Complete();
-            this.generateMeshJob[i].vertexNormals.Dispose();
             this.generateMeshJob[i].breakPoints.Dispose();
             this.generateMeshJob[i].voxelsMerged.Dispose();
             this.generateMeshJob[i].lightsMerged.Dispose();
+            this.generateMeshJob[i].voxelGradients.Dispose();
+            this.generateMeshJob[i].voxelLights.Dispose();
             this.generateMeshJob[i].mcCornerPositions.Dispose();
             this.generateMeshJob[i].mcCellClasses.Dispose();
             this.generateMeshJob[i].mcCellGeometryCounts.Dispose();
@@ -1404,7 +1407,7 @@ public class World : MonoBehaviour
             this.generateMeshJob[i].cornerPositions.Dispose();
             this.generateMeshJob[i].cornerVoxels.Dispose();
             this.generateMeshJob[i].cornerLights.Dispose();
-            this.generateMeshJob[i].cornerIndices.Dispose();
+            this.generateMeshJob[i].cornerGradients.Dispose();
             this.generateMeshJob[i].cellIndices.Dispose();
             this.generateMeshJob[i].mappedIndices.Dispose();
             this.generateMeshJob[i].voxels00.Dispose();
@@ -1467,10 +1470,11 @@ public class World : MonoBehaviour
         //
 
         if (!this.worldEditMeshJobDone) this.worldEditMeshJobHandle.Complete();
-        this.worldEditMeshJob.vertexNormals.Dispose();
         this.worldEditMeshJob.breakPoints.Dispose();
         this.worldEditMeshJob.voxelsMerged.Dispose();
         this.worldEditMeshJob.lightsMerged.Dispose();
+        this.worldEditMeshJob.voxelGradients.Dispose();
+        this.worldEditMeshJob.voxelLights.Dispose();
         this.worldEditMeshJob.mcCornerPositions.Dispose();
         this.worldEditMeshJob.mcCellClasses.Dispose();
         this.worldEditMeshJob.mcCellGeometryCounts.Dispose();
@@ -1487,7 +1491,7 @@ public class World : MonoBehaviour
         this.worldEditMeshJob.cornerPositions.Dispose();
         this.worldEditMeshJob.cornerVoxels.Dispose();
         this.worldEditMeshJob.cornerLights.Dispose();
-        this.worldEditMeshJob.cornerIndices.Dispose();
+        this.worldEditMeshJob.cornerGradients.Dispose();
         this.worldEditMeshJob.cellIndices.Dispose();
         this.worldEditMeshJob.mappedIndices.Dispose();
         this.worldEditMeshJob.voxels00.Dispose();

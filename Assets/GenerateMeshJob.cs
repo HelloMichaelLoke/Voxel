@@ -13,8 +13,15 @@ public struct GenerateMeshJob : IJob
     public NativeArray<Voxel> voxelsMerged;
     public NativeArray<byte> lightsMerged;
 
+    public NativeArray<float3> voxelGradients;
+    public NativeArray<float2> voxelLights;
+
     // Chunk Data
     public int2 chunkPosition;
+
+    // Helpers
+    private bool isEmpty;
+    private bool isFull;
 
     // Terrain Data
     public NativeArray<Voxel>   voxels00;
@@ -37,7 +44,6 @@ public struct GenerateMeshJob : IJob
     public NativeArray<byte>    lights22;
 
     // Mesh Data
-    public NativeHashMap<Vector3, Vector3> vertexNormals;
     public NativeList<Vector3> vertices;
     public NativeList<Vector3> normals;
     public NativeList<int> indices;
@@ -58,7 +64,7 @@ public struct GenerateMeshJob : IJob
     public NativeArray<float3> cornerPositions;
     public NativeArray<Voxel> cornerVoxels;
     public NativeArray<float2> cornerLights;
-    public NativeArray<int> cornerIndices;
+    public NativeArray<float3> cornerGradients;
     public NativeList<int> cellIndices;
     public NativeList<ushort> mappedIndices;
 
@@ -68,6 +74,7 @@ public struct GenerateMeshJob : IJob
     public void Execute()
     {
         this.MergeChunks();
+        this.PrepareGradientsAndLights();
         this.MeshCells();
     }
 
@@ -76,11 +83,11 @@ public struct GenerateMeshJob : IJob
         int i = 0;
         int index;
 
-        for (int y = 0; y <= 255; y++)
+        for (int y = 0; y < 256; y++)
         {
-            for (int z = 0; z <= 18; z++)
+            for (int z = 0; z < 19; z++)
             {
-                for (int x = 0; x <= 18; x++)
+                for (int x = 0; x < 19; x++)
                 {
                     Voxel voxel = new Voxel();
                     byte light = 0;
@@ -149,13 +156,31 @@ public struct GenerateMeshJob : IJob
         }
     }
 
+    private void PrepareGradientsAndLights()
+    {
+        int i = 0;
+        for (int y = 1; y < 255; y++)
+        {
+            for (int z = 1; z < 18; z++)
+            {
+                for (int x = 1; x < 18; x++)
+                {
+                    int index = x + y * 361 + z * 19;
+                    this.voxelLights[i] = this.GetLight(index);
+                    this.voxelGradients[i] = this.GetGradient(index);
+                    i++;
+                }
+            }
+        }
+    }
+
     private void MeshCells()
     {
-        for (int y = 1; y <= 253; y++)
+        for (int y = 1; y < 254; y++)
         {
-            for (int z = 1; z <= 16; z++)
+            for (int z = 1; z < 17; z++)
             {
-                for (int x = 1; x <= 16; x++)
+                for (int x = 1; x < 17; x++)
                 {
                     this.MeshCell(x, y, z);
                 }
@@ -167,42 +192,73 @@ public struct GenerateMeshJob : IJob
     {
         if (x == 1 && z == 1 && y % 16 == 1)
         {
-            // TODO | Check if breakpoint was affected to avoid useless collider updates
             this.breakPoints.Add(new int2(this.vertices.Length, this.indices.Length));
         }
 
-        bool isEmpty = true;
-        bool isFull = true;
+        int index = x + y * 361 + z * 19;
 
-        for (int i = 0; i < 8; i++)
-        {
-            this.cornerPositions[i] = this.mcCornerPositions[i] + new float3(x, y, z);
-            int index = (int)(this.cornerPositions[i].x + this.cornerPositions[i].z * 19.0f + this.cornerPositions[i].y * 361.0f);
-            this.cornerIndices[i] = index;
-            this.cornerVoxels[i] = this.voxelsMerged[index];
+        this.cornerVoxels[0] = this.voxelsMerged[index];
+        this.cornerVoxels[1] = this.voxelsMerged[index + 1];
+        this.cornerVoxels[2] = this.voxelsMerged[index + 19];
+        this.cornerVoxels[3] = this.voxelsMerged[index + 20];
+        this.cornerVoxels[4] = this.voxelsMerged[index + 361];
+        this.cornerVoxels[5] = this.voxelsMerged[index + 362];
+        this.cornerVoxels[6] = this.voxelsMerged[index + 380];
+        this.cornerVoxels[7] = this.voxelsMerged[index + 381];
 
-            if (this.cornerVoxels[i].IsSolid())
-            {
-                isEmpty = false;
-            }
-            else
-            {
-                isFull = false;
-            }
-        }
+        this.isEmpty = true;
+        this.isFull = true;
+
+        if (this.cornerVoxels[0].IsSolid()) this.isEmpty = false; else this.isFull = false;
+        if (this.cornerVoxels[1].IsSolid()) this.isEmpty = false; else this.isFull = false;
+        if (this.cornerVoxels[2].IsSolid()) this.isEmpty = false; else this.isFull = false;
+        if (this.cornerVoxels[3].IsSolid()) this.isEmpty = false; else this.isFull = false;
+        if (this.cornerVoxels[4].IsSolid()) this.isEmpty = false; else this.isFull = false;
+        if (this.cornerVoxels[5].IsSolid()) this.isEmpty = false; else this.isFull = false;
+        if (this.cornerVoxels[6].IsSolid()) this.isEmpty = false; else this.isFull = false;
+        if (this.cornerVoxels[7].IsSolid()) this.isEmpty = false; else this.isFull = false;
 
         if (isEmpty || isFull)
         {
             return;
         }
 
-        for (int i = 0; i < 8; i++)
-        {
-            int index = (int)(this.cornerPositions[i].x + this.cornerPositions[i].z * 19.0f + this.cornerPositions[i].y * 361.0f);
-            this.cornerLights[i] = this.GetLight(index);
-        }
+        int index0 = (x - 1) + (y - 1) * 289 + (z - 1) * 17;
+        int index1 = index0 + 1;
+        int index2 = index0 + 17;
+        int index3 = index0 + 18;
+        int index4 = index0 + 289;
+        int index5 = index0 + 290;
+        int index6 = index0 + 306;
+        int index7 = index0 + 307;
 
-        // Set the cell's material id's for the shader
+        this.cornerLights[0] = this.voxelLights[index0];
+        this.cornerLights[1] = this.voxelLights[index1];
+        this.cornerLights[2] = this.voxelLights[index2];
+        this.cornerLights[3] = this.voxelLights[index3];
+        this.cornerLights[4] = this.voxelLights[index4];
+        this.cornerLights[5] = this.voxelLights[index5];
+        this.cornerLights[6] = this.voxelLights[index6];
+        this.cornerLights[7] = this.voxelLights[index7];
+
+        this.cornerGradients[0] = this.voxelGradients[index0];
+        this.cornerGradients[1] = this.voxelGradients[index1];
+        this.cornerGradients[2] = this.voxelGradients[index2];
+        this.cornerGradients[3] = this.voxelGradients[index3];
+        this.cornerGradients[4] = this.voxelGradients[index4];
+        this.cornerGradients[5] = this.voxelGradients[index5];
+        this.cornerGradients[6] = this.voxelGradients[index6];
+        this.cornerGradients[7] = this.voxelGradients[index7];
+
+        this.cornerPositions[0] = new float3(x, y, z);
+        this.cornerPositions[1] = new float3(x + 1.0f, y, z);
+        this.cornerPositions[2] = new float3(x, y, z + 1.0f);
+        this.cornerPositions[3] = new float3(x + 1.0f, y, z + 1.0f);
+        this.cornerPositions[4] = new float3(x, y + 1.0f, z);
+        this.cornerPositions[5] = new float3(x + 1.0f, y + 1.0f, z);
+        this.cornerPositions[6] = new float3(x, y + 1.0f, z + 1.0f);
+        this.cornerPositions[7] = new float3(x + 1.0f, y + 1.0f, z + 1.0f);
+
         float matId1 = (float)this.cornerVoxels[0].GetMaterial();
         float matId2 = (float)this.cornerVoxels[1].GetMaterial();
         float matId3 = (float)this.cornerVoxels[2].GetMaterial();
@@ -247,74 +303,59 @@ public struct GenerateMeshJob : IJob
         this.mappedIndices.Clear();
         float4 weights1234 = float4.zero;
         float4 weights5678 = float4.zero;
+        float materialId;
+        float3 vertex;
+        Vector3 normal;
+        ushort edgeCode;
+        ushort cornerIndex0;
+        ushort cornerIndex1;
+        float density0;
+        float density1;
+        float distance;
+        float weight0;
+        float weight1;
+        float sunLight;
+        float sourceLight;
+        bool isMaterialSet;
 
         for (int i = 0; i < vertexCount; i++)
         {
-            ushort edgeCode = this.mcCellVertexData[caseIndex * 12 + i];
+            edgeCode = this.mcCellVertexData[caseIndex * 12 + i];
+            cornerIndex0 = (byte)((edgeCode >> 4) & 0x0F);
+            cornerIndex1 = (byte)((edgeCode) & 0x0F);
 
-            ushort cornerIndex0 = (byte)((edgeCode >> 4) & 0x0F);
-            ushort cornerIndex1 = (byte)((edgeCode) & 0x0F);
-
-            float3 position0 = this.cornerPositions[cornerIndex0];
-            float3 position1 = this.cornerPositions[cornerIndex1];
-            Voxel voxel0 = this.cornerVoxels[cornerIndex0];
-            Voxel voxel1 = this.cornerVoxels[cornerIndex1];
-            bool solid0 = (this.cornerVoxels[cornerIndex0].IsSolid());
-            bool solid1 = (this.cornerVoxels[cornerIndex1].IsSolid());
-            float sunLight0 = this.cornerLights[cornerIndex0].x;
-            float sunLight1 = this.cornerLights[cornerIndex1].x;
-            float sourceLight0 = this.cornerLights[cornerIndex0].y;
-            float sourceLight1 = this.cornerLights[cornerIndex1].y;
-            int index0 = this.cornerIndices[cornerIndex0];
-            int index1 = this.cornerIndices[cornerIndex1];
-
-            //
             // Weights
-            //
-
-            float density0 = (float)voxel0.GetDensity();
-            float density1 = (float)voxel1.GetDensity();
+            density0 = (float)this.cornerVoxels[cornerIndex0].GetDensity();
+            density1 = (float)this.cornerVoxels[cornerIndex1].GetDensity();
             if (density0 >= 0.0f) density0 += 1.0f;
             if (density1 >= 0.0f) density1 += 1.0f;
-            float distance = math.abs(density1) + math.abs(density0);
+            distance = math.abs(density1 - density0);
             density0 /= distance;
             density1 /= distance;
 
-            float weight0 = math.abs(density1);
-            float weight1 = 1.0f - weight0;
+            weight0 = math.abs(density1);
+            weight1 = 1.0f - weight0;
 
-            //
-            // Vertex, Normal, Material and Light
-            //
+            // Vertex
+            vertex = weight0 * this.cornerPositions[cornerIndex0] + weight1 * this.cornerPositions[cornerIndex1];
 
-            float3 vertex = weight0 * position0 + weight1 * position1;
-
-            Vector3 normal = weight0 * this.GetGradient(index0) + weight1 * this.GetGradient(index1);
-
+            // Normal
+            normal = weight0 * this.cornerGradients[cornerIndex0] + weight1 * this.cornerGradients[cornerIndex1];
             if (normal != Vector3.zero) normal = math.normalize(normal);
 
-            float materialId = 0.0f;
-            float sunLight = 0.0f;
-            float sourceLight = 0.0f;
-
-            if (solid0)
+            // Material
+            if (this.cornerVoxels[cornerIndex0].IsSolid())
             {
-                materialId = this.GetMaterial(index0);
+                materialId = (float)this.cornerVoxels[cornerIndex0].GetMaterial();
             }
             else
             {
-                materialId = this.GetMaterial(index1);
+                materialId = (float)this.cornerVoxels[cornerIndex1].GetMaterial();
             }
 
-            //if (solid0 && this.lightsMerged[index1] == 0) { sunLight0 = 0.0f; sunLight1 = 0.0f; };
-            //if (solid1 && this.lightsMerged[index0] == 0) { sunLight0 = 0.0f; sunLight1 = 0.0f; };
-
-            sunLight = weight0 * sunLight0 + weight1 * sunLight1;
-            sourceLight = weight0 * sourceLight0 + weight1 * sourceLight1;
-
-            //
-            // Set Mesh Data
-            //
+            // Lights
+            sunLight = weight0 * this.cornerLights[cornerIndex0].x + weight1 * this.cornerLights[cornerIndex1].x;
+            sourceLight = weight0 * this.cornerLights[cornerIndex0].y + weight1 * this.cornerLights[cornerIndex1].y;
 
             this.lights.Add(new float2(sunLight / 15.0f, sourceLight / 15.0f));
             this.vertices.Add(vertex - new float3(1.0f, 0.0f, 1.0f));
@@ -322,7 +363,7 @@ public struct GenerateMeshJob : IJob
             this.mats1234.Add(matIds1234);
             this.mats5678.Add(matIds5678);
 
-            bool isMaterialSet = false;
+            isMaterialSet = false;
             if (matId1 == materialId) { weights1234.x = 1.0f; isMaterialSet = true; } else weights1234.x = 0.0f;
             if (matId2 == materialId && !isMaterialSet) { weights1234.y = 1.0f; isMaterialSet = true; } else weights1234.y = 0.0f;
             if (matId3 == materialId && !isMaterialSet) { weights1234.z = 1.0f; isMaterialSet = true; } else weights1234.z = 0.0f;
@@ -349,7 +390,7 @@ public struct GenerateMeshJob : IJob
 
     private float2 GetLight(int index)
     {
-        float sunLight = sunLight = (float)((this.lightsMerged[index] >> 4) & 0xF);
+        float sunLight = 0.0f;
 
         for (int x = -1; x <= 1; x++)
         {
@@ -362,28 +403,25 @@ public struct GenerateMeshJob : IJob
             }
         }
 
-        //sunLight = math.max(sunLight, (float)((this.lightsMerged[index] >> 4) & 0xF));
-        //sunLight = math.max(sunLight, (float)((this.lightsMerged[index + 1] >> 4) & 0xF));
-        //sunLight = math.max(sunLight, (float)((this.lightsMerged[index - 1] >> 4) & 0xF));
-        //sunLight = math.max(sunLight, (float)((this.lightsMerged[index + 361] >> 4) & 0xF));
-        //sunLight = math.max(sunLight, (float)((this.lightsMerged[index - 361] >> 4) & 0xF));
-        //sunLight = math.max(sunLight, (float)((this.lightsMerged[index + 19] >> 4) & 0xF));
-        //sunLight = math.max(sunLight, (float)((this.lightsMerged[index - 19] >> 4) & 0xF));
+        float sourceLight = 0.0f;
 
-        // TODO Get Max
-        float sourceLight = sourceLight = (float)(this.lightsMerged[index] & 0xF);
+        for (int x = -1; x <= 1; x++)
+        {
+            for (int y = -1; y <= 1; y++)
+            {
+                for (int z = -1; z <= 1; z++)
+                {
+                    sourceLight = math.max(sourceLight, (float)((this.lightsMerged[index + x + (y * 361) + (z * 19)]) & 0b_0000_1111));
+                }
+            }
+        }
 
         return new float2(sunLight, sourceLight);
     }
 
-    private Voxel GetVoxel(int index)
+    private float3 GetGradient(int index)
     {
-        return this.voxelsMerged[index];
-    }
-
-    private Vector3 GetGradient(int index)
-    {
-        Vector3 gradient = Vector3.zero;
+        float3 gradient = new float3(0.0f, 0.0f, 0.0f);
 
         int offset = 0;
         for (int z = -1; z <= 1; z++)
@@ -393,28 +431,16 @@ public struct GenerateMeshJob : IJob
                 for (int x = -1; x <= 1; x++)
                 {
                     offset = x + y * 361 + z * 19;
-                    gradient += this.GetVoxel(index + offset).GetDensity() * new Vector3(x, y, z);
+                    gradient += (float)this.voxelsMerged[index + offset].GetDensity() * new float3(x, y, z);
                 }
             }
         }
 
-        //gradient += this.GetVoxel(index + 1).GetDensity() * new Vector3(1.0f, 0.0f, 0.0f);
-        //gradient += this.GetVoxel(index - 1).GetDensity() * new Vector3(-1.0f, 0.0f, 0.0f);
-        //gradient += this.GetVoxel(index + 361).GetDensity() * new Vector3(0.0f, 1.0f, 0.0f);
-        //gradient += this.GetVoxel(index - 361).GetDensity() * new Vector3(0.0f, -1.0f, 0.0f);
-        //gradient += this.GetVoxel(index + 19).GetDensity() * new Vector3(0.0f, 0.0f, 1.0f);
-        //gradient += this.GetVoxel(index - 19).GetDensity() * new Vector3(0.0f, 0.0f, -1.0f);
-
-        if (gradient != Vector3.zero)
+        if (!gradient.Equals(new float3(0.0f, 0.0f, 0.0f)))
         {
             gradient = math.normalize(gradient);
         }
 
         return gradient;
-    }
-
-    private byte GetMaterial(int index)
-    {
-        return this.GetVoxel(index).GetMaterial();
     }
 }

@@ -207,7 +207,7 @@ public struct GenerateVoxelsJob : IJob
     
     private float GetHeight(float2 position)
     {
-        position += new float2(1000.0f, 1000.0f);
+        position += new float2(10000.0f, -10000.0f);
         position *= 0.001f;
 
         // NOISE 1
