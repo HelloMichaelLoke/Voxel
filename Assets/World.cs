@@ -116,15 +116,15 @@ public class World : MonoBehaviour
         this.LoadChunks();
         this.ActivateChunks();
 
-        this.GenerateVoxels(); // 3-12ms
-        this.GenerateLights(); // 2 - 32ms sometimes.. (most of the time < 1ms)
-        this.GenerateMeshes(); // 5 - 30ms
-        this.BakePhysicsMeshes(); // 2 - 22ms sometimes (mostly < 1ms)
+        this.GenerateVoxels();
+        this.GenerateLights();
+        this.GenerateMeshes();
+        this.BakePhysicsMeshes();
 
         this.UpdateWorldEdit();
         this.UpdatePlayerPositionLast();
 
-        this.stopStopwatch("World Update", 20);
+        this.stopStopwatch("World Update", 2);
     }
 
     private void OnApplicationQuit()
@@ -572,24 +572,40 @@ public class World : MonoBehaviour
         {
             Vector2Int chunkPosition = this.chunksToLoad.Dequeue();
 
-            if (this.IsInChunkDistance(chunkPosition, 2))
+            if (!this.chunks.ContainsKey(chunkPosition))
             {
                 this.generateVoxelsQueue.Enqueue(chunkPosition);
+
+                if (this.IsInChunkDistance(chunkPosition, 1))
+                {
+                    this.generateLightsQueue.Enqueue(chunkPosition);
+                }
+                
+                if (this.IsInChunkDistance(chunkPosition))
+                {
+                    this.generateMeshQueue.Enqueue(chunkPosition);
+                }
+            }
+            else
+            {
+                if (this.IsInChunkDistance(chunkPosition, 1) && !this.chunks[chunkPosition].hasLights)
+                {
+                    this.generateLightsQueue.Enqueue(chunkPosition);
+                }
+
+                if (this.IsInChunkDistance(chunkPosition) && !this.chunks[chunkPosition].hasObjects)
+                {
+                    this.generateMeshQueue.Enqueue(chunkPosition);
+                }
             }
 
-            if (this.IsInChunkDistance(chunkPosition, 1))
+            if (this.chunkObjects.ContainsKey(chunkPosition))
             {
-                this.generateLightsQueue.Enqueue(chunkPosition);
-            }
-            
-            if (this.IsInChunkDistance(chunkPosition))
-            {
-                this.generateMeshQueue.Enqueue(chunkPosition);
-            }
-
-            if (this.IsInChunkDistance(chunkPosition))
-            {
-                this.chunksToActivate.Enqueue(chunkPosition);
+                if (!this.chunkObjects[chunkPosition].IsActive() && this.IsInChunkDistance(chunkPosition))
+                {
+                    this.chunksToActivate.Enqueue(chunkPosition);
+                }
+                continue;
             }
         }
 
@@ -607,18 +623,9 @@ public class World : MonoBehaviour
             return;
         }
 
-        Vector2Int chunkPosition;
-        while (this.chunksToActivate.Count > 0)
+        if (this.chunksToActivate.Count > 0)
         {
-            chunkPosition = this.chunksToActivate.Dequeue();
-            if (this.chunkObjects.ContainsKey(chunkPosition))
-            {
-                if (!this.chunkObjects[chunkPosition].IsActive())
-                {
-                    this.chunkObjects[chunkPosition].Activate();
-                    break;
-                }
-            }
+            this.chunkObjects[this.chunksToActivate.Dequeue()].Activate();
         }
     }
 
@@ -639,25 +646,10 @@ public class World : MonoBehaviour
             return;
         }
 
-        if (this.generateVoxelsQueue.Count == 0)
+        for (int i = 0; (this.generateVoxelsQueue.Count > 0) && (i < this.generateVoxelsJobCount); i++)
         {
-            return;
-        }
-
-        for (int i = 0; i < this.generateVoxelsJobCount; i++)
-        {
-            if (this.generateVoxelsJobDone[i] && this.generateVoxelsQueue.Count > 0)
+            if (this.generateVoxelsJobDone[i])
             {
-                while (this.generateVoxelsQueue.Count > 0 && this.chunks.ContainsKey(this.generateVoxelsQueue.Peek()))
-                {
-                    this.generateVoxelsQueue.Dequeue();
-                }
-
-                if (this.generateVoxelsQueue.Count == 0)
-                {
-                    return;
-                }
-
                 Vector2Int chunkPosition = this.generateVoxelsQueue.Dequeue();
 
                 this.generateVoxelsJob[i].chunkPosition = new int2(chunkPosition.x, chunkPosition.y);
@@ -703,43 +695,12 @@ public class World : MonoBehaviour
             return;
         }
 
-        for (int i = 0; i < this.generateLightsJobCount; i++)
+        for (int i = 0; (this.generateLightsQueue.Count > 0) && (i < this.generateLightsJobCount); i++)
         {
-            if (this.generateLightsQueue.Count == 0)
-            {
-                return;
-            }
-
             if (this.generateLightsJobDone[i])
             {
-                Vector2Int chunkPosition;
+                Vector2Int chunkPosition = this.generateLightsQueue.Peek();
 
-                while (this.generateLightsQueue.Count > 0)
-                {
-                    chunkPosition = this.generateLightsQueue.Peek();
-                    if (!this.chunks.ContainsKey(chunkPosition))
-                    {
-                        return;
-                    }
-
-                    if (this.chunks[chunkPosition].hasLights)
-                    {
-                        this.generateLightsQueue.Dequeue();
-                    }
-                    else
-                    {
-                        break;
-                    }
-                }
-
-                if (this.generateLightsQueue.Count == 0)
-                {
-                    return;
-                }
-
-                chunkPosition = this.generateLightsQueue.Peek();
-
-                bool neighborsDone = true;
                 Vector2Int neighborPosition = new Vector2Int(0, 0);
                 for (int x = -1; x <= 1; x++)
                 {
@@ -752,33 +713,26 @@ public class World : MonoBehaviour
 
                         if (!this.chunks.ContainsKey(neighborPosition))
                         {
-                            neighborsDone = false;
+                            return;
                         }
                     }
                 }
 
-                if (neighborsDone)
-                {
-                    this.generateLightsQueue.Dequeue();
+                this.generateLightsQueue.Dequeue();
 
-                    this.generateLightsJob[i].voxels00.CopyFrom(this.chunks[chunkPosition + new Vector2Int(-1, -1)].GetVoxels());
-                    this.generateLightsJob[i].voxels10.CopyFrom(this.chunks[chunkPosition + new Vector2Int(0, -1)].GetVoxels());
-                    this.generateLightsJob[i].voxels20.CopyFrom(this.chunks[chunkPosition + new Vector2Int(1, -1)].GetVoxels());
-                    this.generateLightsJob[i].voxels01.CopyFrom(this.chunks[chunkPosition + new Vector2Int(-1, 0)].GetVoxels());
-                    this.generateLightsJob[i].voxels11.CopyFrom(this.chunks[chunkPosition + new Vector2Int(0, 0)].GetVoxels());
-                    this.generateLightsJob[i].voxels21.CopyFrom(this.chunks[chunkPosition + new Vector2Int(1, 0)].GetVoxels());
-                    this.generateLightsJob[i].voxels02.CopyFrom(this.chunks[chunkPosition + new Vector2Int(-1, 1)].GetVoxels());
-                    this.generateLightsJob[i].voxels12.CopyFrom(this.chunks[chunkPosition + new Vector2Int(0, 1)].GetVoxels());
-                    this.generateLightsJob[i].voxels22.CopyFrom(this.chunks[chunkPosition + new Vector2Int(1, 1)].GetVoxels());
-                    this.generateLightsJob[i].chunkPosition = new int2(chunkPosition.x, chunkPosition.y);
+                this.generateLightsJob[i].voxels00.CopyFrom(this.chunks[chunkPosition + new Vector2Int(-1, -1)].GetVoxels());
+                this.generateLightsJob[i].voxels10.CopyFrom(this.chunks[chunkPosition + new Vector2Int(0, -1)].GetVoxels());
+                this.generateLightsJob[i].voxels20.CopyFrom(this.chunks[chunkPosition + new Vector2Int(1, -1)].GetVoxels());
+                this.generateLightsJob[i].voxels01.CopyFrom(this.chunks[chunkPosition + new Vector2Int(-1, 0)].GetVoxels());
+                this.generateLightsJob[i].voxels11.CopyFrom(this.chunks[chunkPosition + new Vector2Int(0, 0)].GetVoxels());
+                this.generateLightsJob[i].voxels21.CopyFrom(this.chunks[chunkPosition + new Vector2Int(1, 0)].GetVoxels());
+                this.generateLightsJob[i].voxels02.CopyFrom(this.chunks[chunkPosition + new Vector2Int(-1, 1)].GetVoxels());
+                this.generateLightsJob[i].voxels12.CopyFrom(this.chunks[chunkPosition + new Vector2Int(0, 1)].GetVoxels());
+                this.generateLightsJob[i].voxels22.CopyFrom(this.chunks[chunkPosition + new Vector2Int(1, 1)].GetVoxels());
+                this.generateLightsJob[i].chunkPosition = new int2(chunkPosition.x, chunkPosition.y);
 
-                    this.generateLightsJobHandle[i] = this.generateLightsJob[i].Schedule();
-                    this.generateLightsJobDone[i] = false;
-                }
-                else
-                {
-                    return;
-                }
+                this.generateLightsJobHandle[i] = this.generateLightsJob[i].Schedule();
+                this.generateLightsJobDone[i] = false;
             }
         }
     }
@@ -816,53 +770,12 @@ public class World : MonoBehaviour
             return;
         }
 
-        for (int i = 0; i < this.generateMeshJobCount; i++)
+        for (int i = 0; (this.generateMeshQueue.Count > 0) && (i < this.generateMeshJobCount); i++)
         {
-            if (this.generateMeshQueue.Count == 0)
-            {
-                return;
-            }
-
             if (this.generateMeshJobDone[i])
             {
-                Vector2Int chunkPosition;
+                Vector2Int chunkPosition = this.generateMeshQueue.Peek();
 
-                while (this.generateMeshQueue.Count > 0)
-                {
-                    chunkPosition = this.generateMeshQueue.Peek();
-
-                    if (this.chunks.ContainsKey(chunkPosition))
-                    {
-                        if (this.chunks[chunkPosition].hasObjects)
-                        {
-                            this.generateMeshQueue.Dequeue();
-                        }
-                        else
-                        {
-                            if (this.chunks[chunkPosition].hasLights)
-                            {
-                                break;
-                            }
-                            else
-                            {
-                                return;
-                            }
-                        }
-                    }
-                    else
-                    {
-                        return;
-                    }
-                }
-
-                if (this.generateMeshQueue.Count == 0)
-                {
-                    return;
-                }
-
-                chunkPosition = this.generateMeshQueue.Peek();
-
-                bool neighborsDone = true;
                 Vector2Int neighborPosition = new Vector2Int(0, 0);
                 for (int x = -1; x <= 1; x++)
                 {
@@ -877,66 +790,59 @@ public class World : MonoBehaviour
                         {
                             if (!this.chunks[neighborPosition].hasLights)
                             {
-                                neighborsDone = false;
+                                return;
                             }
                         }
                         else
                         {
-                            neighborsDone = false;
+                            return;
                         }
                     }
                 }
 
-                if (neighborsDone)
-                {
-                    this.generateMeshQueue.Dequeue();
+                this.generateMeshQueue.Dequeue();
 
-                    Chunk chunk00 = this.chunks[chunkPosition + new Vector2Int(-1, -1)];
-                    Chunk chunk10 = this.chunks[chunkPosition + new Vector2Int(0, -1)];
-                    Chunk chunk20 = this.chunks[chunkPosition + new Vector2Int(1, -1)];
-                    Chunk chunk01 = this.chunks[chunkPosition + new Vector2Int(-1, 0)];
-                    Chunk chunk11 = this.chunks[chunkPosition + new Vector2Int(0, 0)];
-                    Chunk chunk21 = this.chunks[chunkPosition + new Vector2Int(1, 0)];
-                    Chunk chunk02 = this.chunks[chunkPosition + new Vector2Int(-1, 1)];
-                    Chunk chunk12 = this.chunks[chunkPosition + new Vector2Int(0, 1)];
-                    Chunk chunk22 = this.chunks[chunkPosition + new Vector2Int(1, 1)];
+                Chunk chunk00 = this.chunks[chunkPosition + new Vector2Int(-1, -1)];
+                Chunk chunk10 = this.chunks[chunkPosition + new Vector2Int(0, -1)];
+                Chunk chunk20 = this.chunks[chunkPosition + new Vector2Int(1, -1)];
+                Chunk chunk01 = this.chunks[chunkPosition + new Vector2Int(-1, 0)];
+                Chunk chunk11 = this.chunks[chunkPosition + new Vector2Int(0, 0)];
+                Chunk chunk21 = this.chunks[chunkPosition + new Vector2Int(1, 0)];
+                Chunk chunk02 = this.chunks[chunkPosition + new Vector2Int(-1, 1)];
+                Chunk chunk12 = this.chunks[chunkPosition + new Vector2Int(0, 1)];
+                Chunk chunk22 = this.chunks[chunkPosition + new Vector2Int(1, 1)];
 
-                    this.generateMeshJob[i].vertices.Clear();
-                    this.generateMeshJob[i].normals.Clear();
-                    this.generateMeshJob[i].indices.Clear();
-                    this.generateMeshJob[i].lights.Clear();
-                    this.generateMeshJob[i].mats1234.Clear();
-                    this.generateMeshJob[i].mats5678.Clear();
-                    this.generateMeshJob[i].weights1234.Clear();
-                    this.generateMeshJob[i].weights5678.Clear();
-                    this.generateMeshJob[i].breakPoints.Clear();
-                    this.generateMeshJob[i].voxels00.CopyFrom(chunk00.GetVoxels());
-                    this.generateMeshJob[i].lights00.CopyFrom(chunk00.GetLights());
-                    this.generateMeshJob[i].voxels10.CopyFrom(chunk10.GetVoxels());
-                    this.generateMeshJob[i].lights10.CopyFrom(chunk10.GetLights());
-                    this.generateMeshJob[i].voxels20.CopyFrom(chunk20.GetVoxels());
-                    this.generateMeshJob[i].lights20.CopyFrom(chunk20.GetLights());
-                    this.generateMeshJob[i].voxels01.CopyFrom(chunk01.GetVoxels());
-                    this.generateMeshJob[i].lights01.CopyFrom(chunk01.GetLights());
-                    this.generateMeshJob[i].voxels11.CopyFrom(chunk11.GetVoxels());
-                    this.generateMeshJob[i].lights11.CopyFrom(chunk11.GetLights());
-                    this.generateMeshJob[i].voxels21.CopyFrom(chunk21.GetVoxels());
-                    this.generateMeshJob[i].lights21.CopyFrom(chunk21.GetLights());
-                    this.generateMeshJob[i].voxels02.CopyFrom(chunk02.GetVoxels());
-                    this.generateMeshJob[i].lights02.CopyFrom(chunk02.GetLights());
-                    this.generateMeshJob[i].voxels12.CopyFrom(chunk12.GetVoxels());
-                    this.generateMeshJob[i].lights12.CopyFrom(chunk12.GetLights());
-                    this.generateMeshJob[i].voxels22.CopyFrom(chunk22.GetVoxels());
-                    this.generateMeshJob[i].lights22.CopyFrom(chunk22.GetLights());
-                    this.generateMeshJob[i].chunkPosition = new int2(chunkPosition.x, chunkPosition.y);
+                this.generateMeshJob[i].vertices.Clear();
+                this.generateMeshJob[i].normals.Clear();
+                this.generateMeshJob[i].indices.Clear();
+                this.generateMeshJob[i].lights.Clear();
+                this.generateMeshJob[i].mats1234.Clear();
+                this.generateMeshJob[i].mats5678.Clear();
+                this.generateMeshJob[i].weights1234.Clear();
+                this.generateMeshJob[i].weights5678.Clear();
+                this.generateMeshJob[i].breakPoints.Clear();
+                this.generateMeshJob[i].voxels00.CopyFrom(chunk00.GetVoxels());
+                this.generateMeshJob[i].lights00.CopyFrom(chunk00.GetLights());
+                this.generateMeshJob[i].voxels10.CopyFrom(chunk10.GetVoxels());
+                this.generateMeshJob[i].lights10.CopyFrom(chunk10.GetLights());
+                this.generateMeshJob[i].voxels20.CopyFrom(chunk20.GetVoxels());
+                this.generateMeshJob[i].lights20.CopyFrom(chunk20.GetLights());
+                this.generateMeshJob[i].voxels01.CopyFrom(chunk01.GetVoxels());
+                this.generateMeshJob[i].lights01.CopyFrom(chunk01.GetLights());
+                this.generateMeshJob[i].voxels11.CopyFrom(chunk11.GetVoxels());
+                this.generateMeshJob[i].lights11.CopyFrom(chunk11.GetLights());
+                this.generateMeshJob[i].voxels21.CopyFrom(chunk21.GetVoxels());
+                this.generateMeshJob[i].lights21.CopyFrom(chunk21.GetLights());
+                this.generateMeshJob[i].voxels02.CopyFrom(chunk02.GetVoxels());
+                this.generateMeshJob[i].lights02.CopyFrom(chunk02.GetLights());
+                this.generateMeshJob[i].voxels12.CopyFrom(chunk12.GetVoxels());
+                this.generateMeshJob[i].lights12.CopyFrom(chunk12.GetLights());
+                this.generateMeshJob[i].voxels22.CopyFrom(chunk22.GetVoxels());
+                this.generateMeshJob[i].lights22.CopyFrom(chunk22.GetLights());
+                this.generateMeshJob[i].chunkPosition = new int2(chunkPosition.x, chunkPosition.y);
 
-                    this.generateMeshJobHandle[i] = this.generateMeshJob[i].Schedule();
-                    this.generateMeshJobDone[i] = false;
-                }
-                else
-                {
-                    return;
-                }
+                this.generateMeshJobHandle[i] = this.generateMeshJob[i].Schedule();
+                this.generateMeshJobDone[i] = false;
             }
         }
     }
