@@ -13,7 +13,7 @@ public class World : MonoBehaviour
     public Material colliderMaterial;
 
     // World Settings
-    private int chunkDistance = 8;
+    private int chunkDistance = 12;
 
     // Player Information
     public GameObject playerGameObject;
@@ -22,17 +22,16 @@ public class World : MonoBehaviour
     private Vector2Int playerChunkPosition = new Vector2Int(2147483647, 2147483647);
     private Vector2Int playerChunkPositionLast = new Vector2Int(2147483647, 2147483647);
     private bool didPlayerEnterChunk = false;
-
     private Vector2Int chunkLoadingOrigin = new Vector2Int(2147483647, 2147483647);
     private Vector2Int chunkLoadingOriginNew = new Vector2Int(2147483647, 2147483647);
     private bool didChunkLoadingOriginChange = false;
 
-    // Material
+    // Materials
     public Material terrainMaterial;
     public Texture2D[] chunkTexturesColor;
     public Texture2D[] chunkTexturesHeight;
 
-    // Chunks store lights, densities and materials
+    // Chunk Storage
     private Dictionary<Vector2Int, Chunk> chunks = new Dictionary<Vector2Int, Chunk>();
     private Dictionary<Vector2Int, ChunkObject> chunkObjects = new Dictionary<Vector2Int, ChunkObject>();
 
@@ -49,7 +48,7 @@ public class World : MonoBehaviour
     private bool[] generateLightsJobDone;
 
     // Generate Mesh Job
-    private int generateMeshJobCount = 5;
+    private int generateMeshJobCount = 6;
     private GenerateMeshJob[] generateMeshJob;
     private JobHandle[] generateMeshJobHandle;
     private bool[] generateMeshJobDone;
@@ -59,19 +58,13 @@ public class World : MonoBehaviour
     private JobHandle bakePhysicsMeshJobHandle;
     private bool bakePhysicsMeshJobDone;
 
-    // World Edit Mesh Job
-    private GenerateMeshJob worldEditMeshJob;
-    private JobHandle worldEditMeshJobHandle;
-    private bool worldEditMeshJobDone = true;
-    private Queue<Vector2Int> worldEditMeshQueue = new Queue<Vector2Int>();
-    private Queue<WorldEditData> worldEditQueue = new Queue<WorldEditData>();
-    private bool isWorldEditBlocked = false;
-    private bool[] worldEditMeshesTouched = new bool[9];
-
     // Light Removal Job
     private LightRemovalJob lightRemovalJob;
     private JobHandle lightRemovalJobHandle;
     private bool lightRemovalJobDone = true;
+
+    // Timer
+    private System.Diagnostics.Stopwatch unloadStopwatch = new System.Diagnostics.Stopwatch();
 
     private bool isUpdateChunkQueuePending = false;
     private bool isUnloadChunksPending = false;
@@ -91,12 +84,7 @@ public class World : MonoBehaviour
     private List<Vector2Int> chunkLoadingOrder = new List<Vector2Int>();
 
     // Diagnostics
-    private System.Diagnostics.Stopwatch unloadStopwatch = new System.Diagnostics.Stopwatch();
-
     private System.Diagnostics.Stopwatch stopwatch = new System.Diagnostics.Stopwatch();
-
-    private bool worldEditQueueEmpty = true;
-    private System.Diagnostics.Stopwatch worldEditStopwatch = new System.Diagnostics.Stopwatch();
 
     private void Start()
     {
@@ -121,7 +109,6 @@ public class World : MonoBehaviour
         this.GenerateMeshes();
         this.BakePhysicsMeshes();
 
-        this.UpdateWorldEdit();
         this.UpdatePlayerPositionLast();
 
         this.stopStopwatch("World Update", 2);
@@ -137,9 +124,10 @@ public class World : MonoBehaviour
         }
     }
 
-    /// <summary>
-    /// Populates the chunk loading order list in a spiral sequence.
-    /// </summary>
+    //////////////////////////////////////////////////////////////////////////////
+    /// INITIALIZATION ///////////////////////////////////////////////////////////
+    //////////////////////////////////////////////////////////////////////////////
+
     private void InitChunkLoadingOrder()
     {
         this.chunkLoadingOrder.Clear();
@@ -180,9 +168,6 @@ public class World : MonoBehaviour
         }
     }
 
-    /// <summary>
-    /// Populates the texture array for the terrain material.
-    /// </summary>
     private void InitMaterial()
     {
         Texture2DArray texColor = new Texture2DArray(1024, 1024, 6, TextureFormat.RGBA32, true, false);
@@ -213,9 +198,6 @@ public class World : MonoBehaviour
         this.terrainMaterial.SetTexture("_TexHeight", texHeight);
     }
 
-    /// <summary>
-    /// Allocates memory for all jobs
-    /// </summary>
     private void InitJobs()
     {
         // Generate Voxels Job
@@ -353,64 +335,18 @@ public class World : MonoBehaviour
             lights12 = new NativeArray<byte>(65536, Allocator.Persistent),
             lights22 = new NativeArray<byte>(65536, Allocator.Persistent)
         };
-
-        // World Edit Mesh Job
-        this.worldEditMeshJob = new GenerateMeshJob()
-        {
-            breakPoints = new NativeList<int2>(Allocator.Persistent),
-            voxelsMerged = new NativeArray<Voxel>(92416, Allocator.Persistent),
-            lightsMerged = new NativeArray<byte>(92416, Allocator.Persistent),
-            voxelGradients = new NativeArray<float3>(73406, Allocator.Persistent),
-            voxelLights = new NativeArray<float2>(73406, Allocator.Persistent),
-            mcCornerPositions = new NativeArray<float3>(Tables.cornerPositions.Length, Allocator.Persistent),
-            mcCellClasses = new NativeArray<byte>(Tables.cellClasses.Length, Allocator.Persistent),
-            mcCellGeometryCounts = new NativeArray<int>(Tables.cellGeometryCounts.Length, Allocator.Persistent),
-            mcCellIndices = new NativeArray<int>(Tables.cellIndices.Length, Allocator.Persistent),
-            mcCellVertexData = new NativeArray<ushort>(Tables.cellVertexData.Length, Allocator.Persistent),
-            voxels00 = new NativeArray<Voxel>(65536, Allocator.Persistent),
-            lights00 = new NativeArray<byte>(65536, Allocator.Persistent),
-            voxels10 = new NativeArray<Voxel>(65536, Allocator.Persistent),
-            lights10 = new NativeArray<byte>(65536, Allocator.Persistent),
-            voxels20 = new NativeArray<Voxel>(65536, Allocator.Persistent),
-            lights20 = new NativeArray<byte>(65536, Allocator.Persistent),
-            voxels01 = new NativeArray<Voxel>(65536, Allocator.Persistent),
-            lights01 = new NativeArray<byte>(65536, Allocator.Persistent),
-            voxels11 = new NativeArray<Voxel>(65536, Allocator.Persistent),
-            lights11 = new NativeArray<byte>(65536, Allocator.Persistent),
-            voxels21 = new NativeArray<Voxel>(65536, Allocator.Persistent),
-            lights21 = new NativeArray<byte>(65536, Allocator.Persistent),
-            voxels02 = new NativeArray<Voxel>(65536, Allocator.Persistent),
-            lights02 = new NativeArray<byte>(65536, Allocator.Persistent),
-            voxels12 = new NativeArray<Voxel>(65536, Allocator.Persistent),
-            lights12 = new NativeArray<byte>(65536, Allocator.Persistent),
-            voxels22 = new NativeArray<Voxel>(65536, Allocator.Persistent),
-            lights22 = new NativeArray<byte>(65536, Allocator.Persistent),
-            vertices = new NativeList<Vector3>(Allocator.Persistent),
-            normals = new NativeList<Vector3>(Allocator.Persistent),
-            indices = new NativeList<int>(Allocator.Persistent),
-            lights = new NativeList<Vector2>(Allocator.Persistent),
-            mats1234 = new NativeList<Vector4>(Allocator.Persistent),
-            mats5678 = new NativeList<Vector4>(Allocator.Persistent),
-            weights1234 = new NativeList<Vector4>(Allocator.Persistent),
-            weights5678 = new NativeList<Vector4>(Allocator.Persistent),
-            cornerPositions = new NativeArray<float3>(8, Allocator.Persistent),
-            cornerVoxels = new NativeArray<Voxel>(8, Allocator.Persistent),
-            cornerLights = new NativeArray<float2>(8, Allocator.Persistent),
-            cornerGradients = new NativeArray<float3>(8, Allocator.Persistent),
-            cellIndices = new NativeList<int>(Allocator.Persistent),
-            mappedIndices = new NativeList<ushort>(Allocator.Persistent)
-        };
-
-        this.worldEditMeshJob.mcCornerPositions.CopyFrom(Tables.cornerPositions);
-        this.worldEditMeshJob.mcCellClasses.CopyFrom(Tables.cellClasses);
-        this.worldEditMeshJob.mcCellGeometryCounts.CopyFrom(Tables.cellGeometryCounts);
-        this.worldEditMeshJob.mcCellIndices.CopyFrom(Tables.cellIndices);
-        this.worldEditMeshJob.mcCellVertexData.CopyFrom(Tables.cellVertexData);
     }
 
-    /// <summary>
-    /// Updates playerChunkPosition and sets didPlayerEnterChunk.
-    /// </summary>
+    //////////////////////////////////////////////////////////////////////////////
+    /// PLAYER POSITION //////////////////////////////////////////////////////////
+    //////////////////////////////////////////////////////////////////////////////
+
+    private void UpdatePlayerPositionLast()
+    {
+        this.playerChunkPositionLast = this.playerChunkPosition;
+        this.playerWorldPositionLast = this.playerWorldPosition.position;
+    }
+
     private void UpdatePlayerPosition()
     {
         this.didPlayerEnterChunk = false;
@@ -419,9 +355,6 @@ public class World : MonoBehaviour
         this.didPlayerEnterChunk = (this.playerChunkPosition != this.playerChunkPositionLast);
     }
 
-    /// <summary>
-    /// Updates chunkLoadingOrigin if the player entered a chunk that is 2 chunks away from the chunkLoadingOrigin.
-    /// </summary>
     private void UpdateChunkLoadingOrigin()
     {
         this.didChunkLoadingOriginChange = false;
@@ -442,13 +375,10 @@ public class World : MonoBehaviour
         this.didChunkLoadingOriginChange = true;
     }
 
-    /// <summary>
-    /// If didChunkLoadingOriginChange is true:<br />
-    /// Clears generateTerrainQueue, generateLightsQueue and generateMeshQueue.<br />
-    /// Sets isUpdateChunkQueuePending to true.<br />
-    /// If isUpdateChunkQueuePending is true and generateTerrainJob, sunLightJob and meshTerrainJob are done:<br />
-    /// Queues up chunksToDestroy, chunksToDeactivate and chunksToLoad if chunkLoadingOrigin changed.
-    /// </summary>
+    //////////////////////////////////////////////////////////////////////////////
+    /// CHUNK UPDATE /////////////////////////////////////////////////////////////
+    //////////////////////////////////////////////////////////////////////////////
+
     private void UpdateChunkQueue()
     {
         if (this.didChunkLoadingOriginChange)
@@ -523,9 +453,6 @@ public class World : MonoBehaviour
         this.isUnloadChunksPending = true;
     }
 
-    /// <summary>
-    /// Incrementally destroy & deactivate chunks.
-    /// </summary>
     private void UnloadChunks()
     {
         if (!this.isUnloadChunksPending)
@@ -560,9 +487,6 @@ public class World : MonoBehaviour
         }
     }
 
-    /// <summary>
-    /// Enqueue jobs for chunks that shall be loaded based on what's already done.
-    /// </summary>
     private void LoadChunks()
     {
         if (!this.isLoadChunksPending)
@@ -614,9 +538,6 @@ public class World : MonoBehaviour
         this.isLoadChunksPending = false;
     }
 
-    /// <summary>
-    /// Activates queued chunk objects.
-    /// </summary>
     private void ActivateChunks()
     {
         if (this.isUpdateChunkQueuePending)
@@ -631,9 +552,10 @@ public class World : MonoBehaviour
         }
     }
 
-    /// <summary>
-    /// Schedules and Completes GenerateVoxelsJob
-    /// </summary>
+    //////////////////////////////////////////////////////////////////////////////
+    /// GENERATE VOXELS //////////////////////////////////////////////////////////
+    //////////////////////////////////////////////////////////////////////////////
+
     private void GenerateVoxels()
     {
         this.GenerateVoxelsSchedule();
@@ -680,9 +602,10 @@ public class World : MonoBehaviour
         }
     }
 
-    /// <summary>
-    /// Schedules and Completes GenerateLightsJob
-    /// </summary>
+    //////////////////////////////////////////////////////////////////////////////
+    /// GENERATE LIGHTS //////////////////////////////////////////////////////////
+    //////////////////////////////////////////////////////////////////////////////
+
     private void GenerateLights()
     {
         this.GenerateLightsSchedule();
@@ -755,9 +678,10 @@ public class World : MonoBehaviour
         }
     }
 
-    /// <summary>
-    /// Schedules and Completes Mesh Jobs
-    /// </summary>
+    //////////////////////////////////////////////////////////////////////////////
+    /// GENERATE MESHES //////////////////////////////////////////////////////////
+    //////////////////////////////////////////////////////////////////////////////
+
     private void GenerateMeshes()
     {
         this.GenerateMeshesSchedule();
@@ -928,9 +852,10 @@ public class World : MonoBehaviour
         }
     }
 
-    /// <summary>
-    /// Schedules and completes physics mesh baking.
-    /// </summary>
+    //////////////////////////////////////////////////////////////////////////////
+    /// BAKE PHYSICS MESHES //////////////////////////////////////////////////////
+    //////////////////////////////////////////////////////////////////////////////
+
     private void BakePhysicsMeshes()
     {
         this.BakePhysicsMeshesSchedule();
@@ -967,390 +892,9 @@ public class World : MonoBehaviour
         }
     }
 
-    /// <summary>
-    /// Handles terrain sculpting.
-    /// </summary>
-    private void UpdateWorldEdit()
-    {
-        if (!this.isWorldEditBlocked && this.lightRemovalJobDone && this.worldEditQueue.Count > 0)
-        {
-            // Get Edit Position
-            WorldEditData worldEditData = this.worldEditQueue.Dequeue();
-            EditPosition editPosition = worldEditData.editPosition;
-            Vector2Int chunkPosition = editPosition.chunkPosition;
-
-            // Check if all neighbors exist
-            bool neighborsDone = true;
-            for (int x = -1; x <= 1; x++)
-            {
-                for (int z = -1; z <= 1; z++)
-                {
-                    if (!this.chunkObjects.ContainsKey(chunkPosition + new Vector2Int(x, z)))
-                    {
-                        neighborsDone = false;
-                    }
-                }
-            }
-
-            // Return if neighbors don't exist
-            if (!neighborsDone)
-            {
-                return;
-            }
-
-            this.worldEditStopwatch.Reset();
-            this.worldEditStopwatch.Start();
-
-            this.isWorldEditBlocked = true;
-
-            // Update Voxels
-            List<VoxelChange> voxelChanges = worldEditData.voxelChanges;
-            bool lightChanged = false;
-            bool densityChanged = false;
-            bool materialChanged = false;
-
-            foreach (VoxelChange voxelChange in voxelChanges)
-            {
-                if (voxelChange.oldVoxel.GetDensity() != voxelChange.newVoxel.GetDensity())
-                {
-                    this.chunks[voxelChange.chunkPosition].SetVoxel(voxelChange.index, voxelChange.newVoxel);
-                    densityChanged = true;
-                }
-
-                if (voxelChange.oldVoxel.GetMaterial() != voxelChange.newVoxel.GetMaterial())
-                {
-                    this.chunks[voxelChange.chunkPosition].SetVoxel(voxelChange.index, voxelChange.newVoxel);
-                    materialChanged = true;
-                }
-
-                if (voxelChange.oldVoxel.IsSolid() != voxelChange.newVoxel.IsSolid())
-                {
-                    lightChanged = true;
-                }
-            }
-
-            // Return if nothing changed
-            if (!lightChanged && !densityChanged && !materialChanged)
-            {
-                Debug.Log("nothing changed");
-                this.isWorldEditBlocked = false;
-                return;
-            }
-
-            // Check for touched Meshes
-            this.worldEditMeshesTouched = new bool[9] { false, false, false, false, false, false, false, false, false };
-
-            Vector3Int relativePosition = editPosition.relativePosition;
-
-            if (relativePosition.z <= 1 && relativePosition.x <= 1)
-                this.worldEditMeshesTouched[0] = true;
-
-            if (relativePosition.z <= 1)
-                this.worldEditMeshesTouched[1] = true;
-
-            if (relativePosition.z <= 1 && relativePosition.x == 15)
-                this.worldEditMeshesTouched[2] = true;
-
-            if (relativePosition.x <= 1)
-                this.worldEditMeshesTouched[3] = true;
-
-            this.worldEditMeshesTouched[4] = true;
-
-            if (relativePosition.x == 15)
-                this.worldEditMeshesTouched[5] = true;
-
-            if (relativePosition.z == 15 && relativePosition.x <= 1)
-                this.worldEditMeshesTouched[6] = true;
-
-            if (relativePosition.z == 15)
-                this.worldEditMeshesTouched[7] = true;
-
-            if (relativePosition.z == 15 && relativePosition.x == 15)
-                this.worldEditMeshesTouched[8] = true;
-
-            // If light didn't change then Queue touched Meshes
-            if (!lightChanged)
-            {
-                if (this.worldEditMeshesTouched[0]) this.worldEditMeshQueue.Enqueue(chunkPosition + new Vector2Int(-1, -1));
-                if (this.worldEditMeshesTouched[1]) this.worldEditMeshQueue.Enqueue(chunkPosition + new Vector2Int(0, -1));
-                if (this.worldEditMeshesTouched[2]) this.worldEditMeshQueue.Enqueue(chunkPosition + new Vector2Int(1, -1));
-                if (this.worldEditMeshesTouched[3]) this.worldEditMeshQueue.Enqueue(chunkPosition + new Vector2Int(-1, 0));
-                if (this.worldEditMeshesTouched[4]) this.worldEditMeshQueue.Enqueue(chunkPosition + new Vector2Int(0, 0));
-                if (this.worldEditMeshesTouched[5]) this.worldEditMeshQueue.Enqueue(chunkPosition + new Vector2Int(1, 0));
-                if (this.worldEditMeshesTouched[6]) this.worldEditMeshQueue.Enqueue(chunkPosition + new Vector2Int(-1, 1));
-                if (this.worldEditMeshesTouched[7]) this.worldEditMeshQueue.Enqueue(chunkPosition + new Vector2Int(0, 1));
-                if (this.worldEditMeshesTouched[8]) this.worldEditMeshQueue.Enqueue(chunkPosition + new Vector2Int(1, 1));
-
-                return;
-            }
-
-            // Queue light changes
-            foreach (VoxelChange voxelChange in voxelChanges)
-            {
-                if (voxelChange.oldVoxel.IsSolid() != voxelChange.newVoxel.IsSolid())
-                {
-                    Vector3Int lightPosition = new Vector3Int(
-                        voxelChange.index % 16,
-                        Mathf.FloorToInt((float)voxelChange.index / 256.0f),
-                        Mathf.FloorToInt(((float)voxelChange.index / 16.0f) % 16)
-                    );
-                    lightPosition.x += 16;
-                    lightPosition.z += 16;
-                    int lightIndex = lightPosition.x + lightPosition.z * 48 + lightPosition.y * 2304;
-
-                    if (voxelChange.newVoxel.IsSolid())
-                    {
-                        this.lightRemovalJob.sunLightRemovalQueue.Enqueue(lightIndex);
-                        this.lightRemovalJob.sourceLightRemovalQueue.Enqueue(lightIndex);
-                    }
-                    else
-                    {
-                        this.lightRemovalJob.sunLightSpreadQueue.Enqueue(lightIndex);
-                        this.lightRemovalJob.sourceLightSpreadQueue.Enqueue(lightIndex);
-                    }
-                }
-            }
-            
-            this.lightRemovalJob.chunkPosition = chunkPosition;
-            this.lightRemovalJob.voxels00.CopyFrom(this.chunks[chunkPosition + new Vector2Int(-1, -1)].GetVoxels());
-            this.lightRemovalJob.voxels10.CopyFrom(this.chunks[chunkPosition + new Vector2Int(0, -1)].GetVoxels());
-            this.lightRemovalJob.voxels20.CopyFrom(this.chunks[chunkPosition + new Vector2Int(1, -1)].GetVoxels());
-            this.lightRemovalJob.voxels01.CopyFrom(this.chunks[chunkPosition + new Vector2Int(-1, 0)].GetVoxels());
-            this.lightRemovalJob.voxels11.CopyFrom(this.chunks[chunkPosition + new Vector2Int(0, 0)].GetVoxels());
-            this.lightRemovalJob.voxels21.CopyFrom(this.chunks[chunkPosition + new Vector2Int(1, 0)].GetVoxels());
-            this.lightRemovalJob.voxels02.CopyFrom(this.chunks[chunkPosition + new Vector2Int(-1, 1)].GetVoxels());
-            this.lightRemovalJob.voxels12.CopyFrom(this.chunks[chunkPosition + new Vector2Int(0, 1)].GetVoxels());
-            this.lightRemovalJob.voxels22.CopyFrom(this.chunks[chunkPosition + new Vector2Int(1, 1)].GetVoxels());
-            this.lightRemovalJob.lights00.CopyFrom(this.chunks[chunkPosition + new Vector2Int(-1, -1)].GetLights());
-            this.lightRemovalJob.lights10.CopyFrom(this.chunks[chunkPosition + new Vector2Int(0, -1)].GetLights());
-            this.lightRemovalJob.lights20.CopyFrom(this.chunks[chunkPosition + new Vector2Int(1, -1)].GetLights());
-            this.lightRemovalJob.lights01.CopyFrom(this.chunks[chunkPosition + new Vector2Int(-1, 0)].GetLights());
-            this.lightRemovalJob.lights11.CopyFrom(this.chunks[chunkPosition + new Vector2Int(0, 0)].GetLights());
-            this.lightRemovalJob.lights21.CopyFrom(this.chunks[chunkPosition + new Vector2Int(1, 0)].GetLights());
-            this.lightRemovalJob.lights02.CopyFrom(this.chunks[chunkPosition + new Vector2Int(-1, 1)].GetLights());
-            this.lightRemovalJob.lights12.CopyFrom(this.chunks[chunkPosition + new Vector2Int(0, 1)].GetLights());
-            this.lightRemovalJob.lights22.CopyFrom(this.chunks[chunkPosition + new Vector2Int(1, 1)].GetLights());
-            this.lightRemovalJobHandle = this.lightRemovalJob.Schedule();
-            this.lightRemovalJobDone = false;
-        }
-
-        if (!this.lightRemovalJobDone && this.lightRemovalJobHandle.IsCompleted)
-        {
-            this.lightRemovalJobHandle.Complete();
-            this.lightRemovalJobDone = true;
-
-            if (this.lightRemovalJob.chunksTouched[0] || this.worldEditMeshesTouched[0])
-            {
-                Vector2Int chunkPosition = this.lightRemovalJob.chunkPosition + new Vector2Int(-1, -1);
-                if (lightRemovalJob.chunksTouched[0])
-                    this.chunks[chunkPosition].SetLightsFromNative(this.lightRemovalJob.lights00);
-                this.worldEditMeshQueue.Enqueue(chunkPosition);
-            }
-            if (this.lightRemovalJob.chunksTouched[1] || this.worldEditMeshesTouched[1])
-            {
-                Vector2Int chunkPosition = this.lightRemovalJob.chunkPosition + new Vector2Int(0, -1);
-                if (lightRemovalJob.chunksTouched[1])
-                    this.chunks[chunkPosition].SetLightsFromNative(this.lightRemovalJob.lights10);
-                this.worldEditMeshQueue.Enqueue(chunkPosition);
-            }
-            if (this.lightRemovalJob.chunksTouched[2] || this.worldEditMeshesTouched[2])
-            {
-                Vector2Int chunkPosition = this.lightRemovalJob.chunkPosition + new Vector2Int(1, -1);
-                if (lightRemovalJob.chunksTouched[2])
-                    this.chunks[chunkPosition].SetLightsFromNative(this.lightRemovalJob.lights20);
-                this.worldEditMeshQueue.Enqueue(chunkPosition);
-            }
-            if (this.lightRemovalJob.chunksTouched[3] || this.worldEditMeshesTouched[3])
-            {
-                Vector2Int chunkPosition = this.lightRemovalJob.chunkPosition + new Vector2Int(-1, 0);
-                if (lightRemovalJob.chunksTouched[3])
-                    this.chunks[chunkPosition].SetLightsFromNative(this.lightRemovalJob.lights01);
-                this.worldEditMeshQueue.Enqueue(chunkPosition);
-            }
-            if (this.lightRemovalJob.chunksTouched[4] || this.worldEditMeshesTouched[4])
-            {
-                Vector2Int chunkPosition = this.lightRemovalJob.chunkPosition + new Vector2Int(0, 0);
-                if (lightRemovalJob.chunksTouched[4])
-                    this.chunks[chunkPosition].SetLightsFromNative(this.lightRemovalJob.lights11);
-                this.worldEditMeshQueue.Enqueue(chunkPosition);
-            }
-            if (this.lightRemovalJob.chunksTouched[5] || this.worldEditMeshesTouched[5])
-            {
-                Vector2Int chunkPosition = this.lightRemovalJob.chunkPosition + new Vector2Int(1, 0);
-                if (lightRemovalJob.chunksTouched[5])
-                    this.chunks[chunkPosition].SetLightsFromNative(this.lightRemovalJob.lights21);
-                this.worldEditMeshQueue.Enqueue(chunkPosition);
-            }
-            if (this.lightRemovalJob.chunksTouched[6] || this.worldEditMeshesTouched[6])
-            {
-                Vector2Int chunkPosition = this.lightRemovalJob.chunkPosition + new Vector2Int(-1, 1);
-                if (lightRemovalJob.chunksTouched[6])
-                    this.chunks[chunkPosition].SetLightsFromNative(this.lightRemovalJob.lights02);
-                this.worldEditMeshQueue.Enqueue(chunkPosition);
-            }
-            if (this.lightRemovalJob.chunksTouched[7] || this.worldEditMeshesTouched[7])
-            {
-                Vector2Int chunkPosition = this.lightRemovalJob.chunkPosition + new Vector2Int(0, 1);
-                if (lightRemovalJob.chunksTouched[7])
-                    this.chunks[chunkPosition].SetLightsFromNative(this.lightRemovalJob.lights12);
-                this.worldEditMeshQueue.Enqueue(chunkPosition);
-            }
-            if (this.lightRemovalJob.chunksTouched[8] || this.worldEditMeshesTouched[8])
-            {
-                Vector2Int chunkPosition = this.lightRemovalJob.chunkPosition + new Vector2Int(1, 1);
-                if (lightRemovalJob.chunksTouched[8])
-                    this.chunks[chunkPosition].SetLightsFromNative(this.lightRemovalJob.lights22);
-                this.worldEditMeshQueue.Enqueue(chunkPosition);
-            }
-        }
-
-        if (this.worldEditMeshJobDone && this.worldEditMeshQueue.Count > 0)
-        {
-            Vector2Int chunkPosition = this.worldEditMeshQueue.Dequeue();
-
-            for (int x = -1; x <= 1; x++)
-            {
-                for (int z = -1; z <= 1; z++)
-                {
-                    Vector2Int offset = new Vector2Int(x, z);
-                    if (!this.chunks.ContainsKey(chunkPosition + offset))
-                    {
-                        return;
-                    }
-                }
-            }
-
-            Chunk chunk00 = this.chunks[chunkPosition + new Vector2Int(-1, -1)];
-            Chunk chunk10 = this.chunks[chunkPosition + new Vector2Int(0, -1)];
-            Chunk chunk20 = this.chunks[chunkPosition + new Vector2Int(1, -1)];
-            Chunk chunk01 = this.chunks[chunkPosition + new Vector2Int(-1, 0)];
-            Chunk chunk11 = this.chunks[chunkPosition + new Vector2Int(0, 0)];
-            Chunk chunk21 = this.chunks[chunkPosition + new Vector2Int(1, 0)];
-            Chunk chunk02 = this.chunks[chunkPosition + new Vector2Int(-1, 1)];
-            Chunk chunk12 = this.chunks[chunkPosition + new Vector2Int(0, 1)];
-            Chunk chunk22 = this.chunks[chunkPosition + new Vector2Int(1, 1)];
-
-            this.worldEditMeshJob.vertices.Clear();
-            this.worldEditMeshJob.normals.Clear();
-            this.worldEditMeshJob.indices.Clear();
-            this.worldEditMeshJob.lights.Clear();
-            this.worldEditMeshJob.mats1234.Clear();
-            this.worldEditMeshJob.mats5678.Clear();
-            this.worldEditMeshJob.weights1234.Clear();
-            this.worldEditMeshJob.weights5678.Clear();
-            this.worldEditMeshJob.breakPoints.Clear();
-
-            this.worldEditMeshJob.voxels00.CopyFrom(chunk00.GetVoxels());
-            this.worldEditMeshJob.lights00.CopyFrom(chunk00.GetLights());
-            this.worldEditMeshJob.voxels10.CopyFrom(chunk10.GetVoxels());
-            this.worldEditMeshJob.lights10.CopyFrom(chunk10.GetLights());
-            this.worldEditMeshJob.voxels20.CopyFrom(chunk20.GetVoxels());
-            this.worldEditMeshJob.lights20.CopyFrom(chunk20.GetLights());
-            this.worldEditMeshJob.voxels01.CopyFrom(chunk01.GetVoxels());
-            this.worldEditMeshJob.lights01.CopyFrom(chunk01.GetLights());
-            this.worldEditMeshJob.voxels11.CopyFrom(chunk11.GetVoxels());
-            this.worldEditMeshJob.lights11.CopyFrom(chunk11.GetLights());
-            this.worldEditMeshJob.voxels21.CopyFrom(chunk21.GetVoxels());
-            this.worldEditMeshJob.lights21.CopyFrom(chunk21.GetLights());
-            this.worldEditMeshJob.voxels02.CopyFrom(chunk02.GetVoxels());
-            this.worldEditMeshJob.lights02.CopyFrom(chunk02.GetLights());
-            this.worldEditMeshJob.voxels12.CopyFrom(chunk12.GetVoxels());
-            this.worldEditMeshJob.lights12.CopyFrom(chunk12.GetLights());
-            this.worldEditMeshJob.voxels22.CopyFrom(chunk22.GetVoxels());
-            this.worldEditMeshJob.lights22.CopyFrom(chunk22.GetLights());
-
-            this.worldEditMeshJob.chunkPosition = new int2(chunkPosition.x, chunkPosition.y);
-            this.worldEditMeshJobHandle = this.worldEditMeshJob.Schedule();
-            this.worldEditMeshJobDone = false;
-        }
-
-        if (!this.worldEditMeshJobDone && this.worldEditMeshJobHandle.IsCompleted)
-        {
-            this.worldEditMeshJobHandle.Complete();
-            this.worldEditMeshJobDone = true;
-
-            Vector2Int chunkPosition = new Vector2Int(this.worldEditMeshJob.chunkPosition.x, this.worldEditMeshJob.chunkPosition.y);
-
-            if (!this.chunkObjects.ContainsKey(chunkPosition))
-                return;
-
-            this.chunkObjects[chunkPosition].SetRenderer(
-                this.worldEditMeshJob.vertices.AsArray(),
-                this.worldEditMeshJob.normals.AsArray(),
-                this.worldEditMeshJob.indices.AsArray(),
-                this.worldEditMeshJob.weights1234.AsArray(),
-                this.worldEditMeshJob.weights5678.AsArray(),
-                this.worldEditMeshJob.mats1234.AsArray(),
-                this.worldEditMeshJob.mats5678.AsArray(),
-                this.worldEditMeshJob.lights.AsArray()
-            );
-
-            for (int i = 0; i < 16; i++)
-            {
-                int startPositionVertices = this.worldEditMeshJob.breakPoints[i].x;
-                int endPositionVertices;
-                int startPositionIndices = this.worldEditMeshJob.breakPoints[i].y;
-                int endPositionIndices;
-
-                if (i < 15)
-                {
-                    endPositionVertices = this.worldEditMeshJob.breakPoints[i + 1].x;
-                    endPositionIndices = this.worldEditMeshJob.breakPoints[i + 1].y;
-                }
-                else
-                {
-                    endPositionVertices = this.worldEditMeshJob.vertices.Length;
-                    endPositionIndices = this.worldEditMeshJob.indices.Length;
-                }
-
-                if (startPositionVertices == endPositionVertices || startPositionIndices == endPositionIndices)
-                {
-                    continue;
-                }
-
-                int lengthVertices = endPositionVertices - startPositionVertices;
-                int lengthIndices = endPositionIndices - startPositionIndices;
-
-                Vector3[] colliderVertices = new Vector3[lengthVertices];
-                this.worldEditMeshJob.vertices.AsArray().GetSubArray(startPositionVertices, lengthVertices).CopyTo(colliderVertices);
-
-                for (int j = 0; j < lengthVertices; j++)
-                {
-                    colliderVertices[j].y -= i * 16.0f;
-                }
-
-                int[] colliderIndices = new int[lengthIndices];
-                this.worldEditMeshJob.indices.AsArray().GetSubArray(startPositionIndices, lengthIndices).CopyTo(colliderIndices);
-
-                int colliderIndicesOffset = startPositionVertices;
-
-                for (int j = 0; j < lengthIndices; j++)
-                {
-                    colliderIndices[j] -= colliderIndicesOffset;
-                }
-
-                this.chunkObjects[chunkPosition].SetColliderMesh(i, colliderVertices, colliderIndices);
-            }
-
-            Debug.Log("done");
-
-            if (this.worldEditMeshQueue.Count == 0)
-            {
-                this.isWorldEditBlocked = false;
-                this.worldEditStopwatch.Stop();
-                Debug.Log("worldEdit took: " + this.worldEditStopwatch.ElapsedMilliseconds + "ms");
-            }
-        }
-    }
-
-    /// <summary>
-    /// Updates playerChunkPositionLast and playerWorldPositionLast
-    /// </summary>
-    private void UpdatePlayerPositionLast()
-    {
-        this.playerChunkPositionLast = this.playerChunkPosition;
-        this.playerWorldPositionLast = this.playerWorldPosition.position;
-    }
+    //////////////////////////////////////////////////////////////////////////////
+    /// CLEAN UP /////////////////////////////////////////////////////////////////
+    //////////////////////////////////////////////////////////////////////////////
 
     private void DisposeJobs()
     {
@@ -1464,251 +1008,11 @@ public class World : MonoBehaviour
         this.lightRemovalJob.lights02.Dispose();
         this.lightRemovalJob.lights12.Dispose();
         this.lightRemovalJob.lights22.Dispose();
-
-        //
-        // Mesh Update Job
-        //
-
-        if (!this.worldEditMeshJobDone) this.worldEditMeshJobHandle.Complete();
-        this.worldEditMeshJob.breakPoints.Dispose();
-        this.worldEditMeshJob.voxelsMerged.Dispose();
-        this.worldEditMeshJob.lightsMerged.Dispose();
-        this.worldEditMeshJob.voxelGradients.Dispose();
-        this.worldEditMeshJob.voxelLights.Dispose();
-        this.worldEditMeshJob.mcCornerPositions.Dispose();
-        this.worldEditMeshJob.mcCellClasses.Dispose();
-        this.worldEditMeshJob.mcCellGeometryCounts.Dispose();
-        this.worldEditMeshJob.mcCellIndices.Dispose();
-        this.worldEditMeshJob.mcCellVertexData.Dispose();
-        this.worldEditMeshJob.vertices.Dispose();
-        this.worldEditMeshJob.normals.Dispose();
-        this.worldEditMeshJob.indices.Dispose();
-        this.worldEditMeshJob.lights.Dispose();
-        this.worldEditMeshJob.mats1234.Dispose();
-        this.worldEditMeshJob.mats5678.Dispose();
-        this.worldEditMeshJob.weights1234.Dispose();
-        this.worldEditMeshJob.weights5678.Dispose();
-        this.worldEditMeshJob.cornerPositions.Dispose();
-        this.worldEditMeshJob.cornerVoxels.Dispose();
-        this.worldEditMeshJob.cornerLights.Dispose();
-        this.worldEditMeshJob.cornerGradients.Dispose();
-        this.worldEditMeshJob.cellIndices.Dispose();
-        this.worldEditMeshJob.mappedIndices.Dispose();
-        this.worldEditMeshJob.voxels00.Dispose();
-        this.worldEditMeshJob.lights00.Dispose();
-        this.worldEditMeshJob.voxels10.Dispose();
-        this.worldEditMeshJob.lights10.Dispose();
-        this.worldEditMeshJob.voxels20.Dispose();
-        this.worldEditMeshJob.lights20.Dispose();
-        this.worldEditMeshJob.voxels01.Dispose();
-        this.worldEditMeshJob.lights01.Dispose();
-        this.worldEditMeshJob.voxels11.Dispose();
-        this.worldEditMeshJob.lights11.Dispose();
-        this.worldEditMeshJob.voxels21.Dispose();
-        this.worldEditMeshJob.lights21.Dispose();
-        this.worldEditMeshJob.voxels02.Dispose();
-        this.worldEditMeshJob.lights02.Dispose();
-        this.worldEditMeshJob.voxels12.Dispose();
-        this.worldEditMeshJob.lights12.Dispose();
-        this.worldEditMeshJob.voxels22.Dispose();
-        this.worldEditMeshJob.lights22.Dispose();
     }
 
-    //
-    // World Edit
-    //
-
-    public bool WorldEditDraw(Vector3 worldPosition, byte material)
-    {
-        if (this.isWorldEditBlocked)
-            return false;
-
-        EditPosition editPosition = this.GetClosestEditPosition(worldPosition, false);
-
-        if (editPosition.index == -1)
-        {
-            Debug.Log("WorldEditDraw: Didn't find a close position.");
-            return false;
-        }
-
-        if (!this.chunks.ContainsKey(editPosition.chunkPosition))
-        {
-            return false;
-        }
-
-        // Voxel
-        List<VoxelChange> voxelChanges = new List<VoxelChange>();
-        Vector2Int chunkPosition = editPosition.chunkPosition;
-        Chunk chunk = this.chunks[chunkPosition];
-        int index = editPosition.index;
-
-        Voxel oldVoxel = chunk.GetVoxel(index);
-        Voxel newVoxel = new Voxel(-128, material);
-        VoxelChange voxelChange = new VoxelChange(chunkPosition, index, oldVoxel, newVoxel);
-        voxelChanges.Add(voxelChange);
-
-        oldVoxel = chunk.GetVoxel(index + 361);
-        if (!oldVoxel.IsSolid())
-        {
-            newVoxel = new Voxel(0, 0);
-            voxelChange = new VoxelChange(chunkPosition, index + 361, oldVoxel, newVoxel);
-            voxelChanges.Add(voxelChange);
-        }
-
-        WorldEditData worldEditData = new WorldEditData(editPosition, voxelChanges);
-
-        this.worldEditQueue.Enqueue(worldEditData);
-
-        return true;
-    }
-
-    public bool WorldEditErase(Vector3 worldPosition)
-    {
-        if (this.isWorldEditBlocked)
-            return false;
-
-        EditPosition editPosition = this.GetClosestEditPosition(worldPosition, true);
-
-        if (editPosition.index == -1)
-        {
-            Debug.Log("WorldEditDraw: Didn't find a close position.");
-            return false;
-        }
-
-        if (!this.chunks.ContainsKey(editPosition.chunkPosition))
-        {
-            return false;
-        }
-
-        // Voxel
-        List<VoxelChange> voxelChanges = new List<VoxelChange>();
-        Vector2Int chunkPosition = editPosition.chunkPosition;
-        Chunk chunk = this.chunks[chunkPosition];
-        int index = editPosition.index;
-
-        Voxel oldVoxel = chunk.GetVoxel(index);
-        Voxel newVoxel = new Voxel(127, 0);
-        VoxelChange voxelChange = new VoxelChange(chunkPosition, index, oldVoxel, newVoxel);
-        voxelChanges.Add(voxelChange);
-
-        WorldEditData worldEditData = new WorldEditData(editPosition, voxelChanges);
-
-        this.worldEditQueue.Enqueue(worldEditData);
-
-        return true;
-    }
-
-    public bool WorldEditAdd(Vector3 worldPosition, int strength)
-    {
-        if (this.isWorldEditBlocked)
-            return false;
-
-        EditPosition editPosition = this.GetClosestEditPosition(worldPosition, true);
-
-        if (editPosition.index == -1)
-        {
-            Debug.Log("WorldEditDraw: Didn't find a close position.");
-            return false;
-        }
-
-        if (!this.chunks.ContainsKey(editPosition.chunkPosition))
-        {
-            return false;
-        }
-
-        // Voxel
-        List<VoxelChange> voxelChanges = new List<VoxelChange>();
-        Vector2Int chunkPosition = editPosition.chunkPosition;
-        Chunk chunk = this.chunks[chunkPosition];
-        int index = editPosition.index;
-
-        Voxel oldVoxel = chunk.GetVoxel(index);
-        int newDensity = (int)oldVoxel.GetDensity() - strength;
-        newDensity = math.clamp(newDensity, -128, -1);
-        Voxel newVoxel = new Voxel((sbyte)newDensity, oldVoxel.GetMaterial());
-        VoxelChange voxelChange = new VoxelChange(chunkPosition, index, oldVoxel, newVoxel);
-        voxelChanges.Add(voxelChange);
-
-        WorldEditData worldEditData = new WorldEditData(editPosition, voxelChanges);
-
-        this.worldEditQueue.Enqueue(worldEditData);
-
-        return true;
-    }
-
-    public bool WorldEditSubstract(Vector3 worldPosition, int strength)
-    {
-        if (this.isWorldEditBlocked)
-            return false;
-
-        EditPosition editPosition = this.GetClosestEditPosition(worldPosition, true);
-
-        if (editPosition.index == -1)
-        {
-            Debug.Log("WorldEditDraw: Didn't find a close position.");
-            return false;
-        }
-
-        if (!this.chunks.ContainsKey(editPosition.chunkPosition))
-        {
-            return false;
-        }
-
-        // Voxel
-        List<VoxelChange> voxelChanges = new List<VoxelChange>();
-        Vector2Int chunkPosition = editPosition.chunkPosition;
-        Chunk chunk = this.chunks[chunkPosition];
-        int index = editPosition.index;
-
-        Voxel oldVoxel = chunk.GetVoxel(index);
-        int newDensity = (int)oldVoxel.GetDensity() + strength;
-        newDensity = math.clamp(newDensity, -128, -1);
-        Voxel newVoxel = new Voxel((sbyte)newDensity, oldVoxel.GetMaterial());
-        VoxelChange voxelChange = new VoxelChange(chunkPosition, index, oldVoxel, newVoxel);
-        voxelChanges.Add(voxelChange);
-
-        WorldEditData worldEditData = new WorldEditData(editPosition, voxelChanges);
-
-        this.worldEditQueue.Enqueue(worldEditData);
-
-        return true;
-    }
-
-    public bool WorldEditPaint(Vector3 worldPosition, byte material)
-    {
-        if (this.isWorldEditBlocked)
-            return false;
-
-        EditPosition editPosition = this.GetClosestEditPosition(worldPosition, true);
-
-        if (editPosition.index == -1)
-        {
-            Debug.Log("WorldEditDraw: Didn't find a close position.");
-            return false;
-        }
-
-        if (!this.chunks.ContainsKey(editPosition.chunkPosition))
-        {
-            return false;
-        }
-
-        // Voxel
-        List<VoxelChange> voxelChanges = new List<VoxelChange>();
-        Vector2Int chunkPosition = editPosition.chunkPosition;
-        Chunk chunk = this.chunks[chunkPosition];
-        int index = editPosition.index;
-
-        Voxel oldVoxel = chunk.GetVoxel(index);
-        Voxel newVoxel = new Voxel(oldVoxel.GetDensity(), material);
-        VoxelChange voxelChange = new VoxelChange(chunkPosition, index, oldVoxel, newVoxel);
-        voxelChanges.Add(voxelChange);
-
-        WorldEditData worldEditData = new WorldEditData(editPosition, voxelChanges);
-
-        this.worldEditQueue.Enqueue(worldEditData);
-
-        return true;
-    }
+    //////////////////////////////////////////////////////////////////////////////
+    /// HELPERS //////////////////////////////////////////////////////////////////
+    //////////////////////////////////////////////////////////////////////////////
 
     private bool IsInChunkDistance(Vector2Int chunkPosition, int overflow = 0)
     {
@@ -1730,52 +1034,9 @@ public class World : MonoBehaviour
         return chunkPosition;
     }
 
-    private EditPosition WorldToEditPosition(Vector3 worldPosition)
-    {
-        // Rounded Position
-        Vector3Int roundedPosition = Vector3Int.RoundToInt(worldPosition);
-        roundedPosition.y = Mathf.Clamp(roundedPosition.y, 2, 253);
-
-        // Relative Position
-        Vector3Int relativePosition = new Vector3Int(
-            roundedPosition.x % 16,
-            roundedPosition.y,
-            roundedPosition.z % 16
-        );
-
-        if (relativePosition.x < 0 && relativePosition.x != 0)
-        {
-            relativePosition.x = relativePosition.x + 16;
-        }
-        if (relativePosition.z < 0 && relativePosition.z != 0)
-        {
-            relativePosition.z = relativePosition.z + 16;
-        }
-
-        // Chunk Position
-        Vector2Int chunkPosition = new Vector2Int(
-            Mathf.FloorToInt(roundedPosition.x / 16.0f),
-            Mathf.FloorToInt(roundedPosition.z / 16.0f)
-        );
-
-        // Index
-        int index = 0;
-        index = relativePosition.x + relativePosition.z * 16 + relativePosition.y * 256;
-
-        EditPosition editPosition = new EditPosition(
-            worldPosition,
-            roundedPosition,
-            relativePosition,
-            chunkPosition,
-            index
-        );
-
-        return editPosition;
-    }
-
-    //
-    // Diagnostics
-    //
+    //////////////////////////////////////////////////////////////////////////////
+    /// DIAGNOSTICS //////////////////////////////////////////////////////////////
+    //////////////////////////////////////////////////////////////////////////////
 
     private void startStopwatch()
     {
@@ -1788,50 +1049,5 @@ public class World : MonoBehaviour
         stopwatch.Stop();
         if (stopwatch.ElapsedMilliseconds > threshold)
             Debug.Log(name + ": " + stopwatch.ElapsedMilliseconds);
-    }
-
-    // Other
-
-    public EditPosition GetClosestEditPosition(Vector3 worldPosition, bool solid)
-    {
-        EditPosition closestEditPosition = new EditPosition(Vector3.zero, Vector3Int.zero, Vector3Int.zero, Vector2Int.zero, -1);
-        float minDistance = 100.0f;
-
-        for (int x = -1; x <= 1; x++)
-        {
-            for (int y = -1; y <= 1; y++)
-            {
-                for (int z = -1; z <= 1; z++)
-                {
-                    EditPosition editPosition = this.WorldToEditPosition(worldPosition + new Vector3(x, y, z));
-
-                    Voxel voxel = this.chunks[editPosition.chunkPosition].GetVoxel(editPosition.index);
-                    bool isValid = false;
-                    if (solid) isValid = (voxel.IsSolid());
-                    if (!solid) isValid = (!voxel.IsSolid());
-
-                    float distance = Vector3.Distance(worldPosition, editPosition.roundedPosition);
-                    if (distance < minDistance && isValid)
-                    {
-                        minDistance = distance;
-                        closestEditPosition = editPosition;
-                    }
-                }
-            }
-        }
-        
-        return closestEditPosition;
-    }
-
-    public float GetLightValue(Vector3 worldPosition)
-    {
-        EditPosition editPosition = this.GetClosestEditPosition(worldPosition, false);
-
-        if (this.chunks.ContainsKey(editPosition.chunkPosition) && editPosition.index != -1)
-        {
-            return (float)this.chunks[editPosition.chunkPosition].GetSunLight(editPosition.index) / 15.0f;
-        }
-
-        return 0.0f;
     }
 }
