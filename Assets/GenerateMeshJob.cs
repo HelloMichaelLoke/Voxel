@@ -6,7 +6,7 @@ using Unity.Collections;
 using Unity.Jobs;
 using Unity.Mathematics;
 
-[BurstCompile(CompileSynchronously = true)]
+[BurstCompile]
 public struct GenerateMeshJob : IJob
 {
     // Temporary Data

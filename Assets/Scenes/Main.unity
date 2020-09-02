@@ -530,14 +530,14 @@ MonoBehaviour:
   terrainMaterial: {fileID: 2100000, guid: e5358b43a20581a49b9e5a29bc795665, type: 2}
   chunkTexturesColor:
   - {fileID: 2800000, guid: 80ff5292ded48e341be61fabf3129c68, type: 3}
-  - {fileID: 2800000, guid: 91018a0ca33ef9f4eab5ad66800ce5d2, type: 3}
-  - {fileID: 2800000, guid: f9f50dc629dcb2b4eb1064305cf9abd9, type: 3}
+  - {fileID: 2800000, guid: ddf54ac7103acfe40a6282f17f262a02, type: 3}
+  - {fileID: 2800000, guid: e4d9bf50597de6643aac7a7f53ff1636, type: 3}
   - {fileID: 2800000, guid: f7079adcbe9e4d5408ab0e664e0e4d7e, type: 3}
   - {fileID: 2800000, guid: e407e1f33c5cb994a8f60a2aecb3b88f, type: 3}
   chunkTexturesHeight:
   - {fileID: 2800000, guid: b7d8404bc8d6f3049a7dab66e1147fd0, type: 3}
-  - {fileID: 2800000, guid: 7217a9e4cc7264244ac4b937443313a6, type: 3}
-  - {fileID: 2800000, guid: 6b1ce67edf4490c47ac9590903986c25, type: 3}
+  - {fileID: 2800000, guid: ca967e3828bcd834c9199c51ad65b84f, type: 3}
+  - {fileID: 2800000, guid: e86fc09499c051b4e9200f0adececdaa, type: 3}
   - {fileID: 2800000, guid: 526bc025b075dfa4c98ffbe672111f75, type: 3}
   - {fileID: 2800000, guid: b81b376902227e54f87d26ad76d1e17b, type: 3}
 --- !u!1 &1180251672
@@ -650,7 +650,7 @@ Transform:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 6665169381040158907}
   m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
-  m_LocalPosition: {x: 13.83, y: 222, z: 10}
+  m_LocalPosition: {x: -1536.3186, y: 155, z: -920.56714}
   m_LocalScale: {x: 1, y: 1, z: 1}
   m_Children:
   - {fileID: 6665169381862078189}

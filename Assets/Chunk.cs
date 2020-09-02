@@ -5,17 +5,53 @@ using Unity.Collections;
 
 public class Chunk
 {
-    private Voxel[] voxels;
-    private byte[] lights;
+    private float[] heightMap = new float[256];
+    private float[] rainMap = new float[256];
+    private float[] heatMap = new float[256];
+    private Voxel[] voxels = new Voxel[65536];
+    private byte[] lights = new byte[65536];
 
+    public bool hasMaps = false;
     public bool hasVoxels = false;
     public bool hasLights = false;
     public bool hasObjects = false;
 
-    public Chunk()
+    //
+    // Set Maps
+    //
+
+    public void SetHeightMapFromNative(NativeArray<float> heightMap)
     {
-        this.voxels = new Voxel[65536];
-        this.lights = new byte[65536];
+        heightMap.CopyTo(this.heightMap);
+    }
+
+    public void SetRainMapFromNative(NativeArray<float> rainMap)
+    {
+        rainMap.CopyTo(this.rainMap);
+    }
+
+    public void SetHeatMapFromNative(NativeArray<float> heatMap)
+    {
+        heatMap.CopyTo(this.heatMap);
+    }
+
+    //
+    // Get Maps
+    //
+
+    public float[] GetHeightMap()
+    {
+        return this.heightMap;
+    }
+
+    public float[] GetRainMap()
+    {
+        return this.rainMap;
+    }
+
+    public float[] GetHeatMap()
+    {
+        return this.heatMap;
     }
 
     //

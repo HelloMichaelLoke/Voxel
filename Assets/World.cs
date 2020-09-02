@@ -13,7 +13,7 @@ public class World : MonoBehaviour
     public Material colliderMaterial;
 
     // World Settings
-    private int chunkDistance = 12;
+    private int chunkDistance = 9;
 
     // Player Information
     public GameObject playerGameObject;
@@ -34,6 +34,12 @@ public class World : MonoBehaviour
     // Chunk Storage
     private Dictionary<Vector2Int, Chunk> chunks = new Dictionary<Vector2Int, Chunk>();
     private Dictionary<Vector2Int, ChunkObject> chunkObjects = new Dictionary<Vector2Int, ChunkObject>();
+
+    // Generate Maps Job
+    private int generateMapsJobCount = 4;
+    private GenerateMapsJob[] generateMapsJob;
+    private JobHandle[] generateMapsJobHandle;
+    private bool[] generateMapsJobDone;
 
     // Generate Voxels Job
     private int generateVoxelsJobCount = 4;
@@ -70,6 +76,7 @@ public class World : MonoBehaviour
     private bool isUnloadChunksPending = false;
     private bool isLoadChunksPending = false;
 
+    private Queue<Vector2Int> generateMapsQueue = new Queue<Vector2Int>();
     private Queue<Vector2Int> generateVoxelsQueue = new Queue<Vector2Int>();
     private Queue<Vector2Int> generateLightsQueue = new Queue<Vector2Int>();
     private Queue<Vector2Int> generateMeshQueue = new Queue<Vector2Int>();
@@ -95,23 +102,18 @@ public class World : MonoBehaviour
 
     private void Update()
     {
-        this.startStopwatch();
-
         this.UpdatePlayerPosition();
         this.UpdateChunkLoadingOrigin();
         this.UpdateChunkQueue();
         this.UnloadChunks();
         this.LoadChunks();
         this.ActivateChunks();
-
+        this.GenerateMaps();
         this.GenerateVoxels();
         this.GenerateLights();
         this.GenerateMeshes();
         this.BakePhysicsMeshes();
-
         this.UpdatePlayerPositionLast();
-
-        this.stopStopwatch("World Update", 2);
     }
 
     private void OnApplicationQuit()
@@ -200,6 +202,20 @@ public class World : MonoBehaviour
 
     private void InitJobs()
     {
+        // Generate Maps Job
+        this.generateMapsJob = new GenerateMapsJob[this.generateMapsJobCount];
+        this.generateMapsJobHandle = new JobHandle[this.generateMapsJobCount];
+        this.generateMapsJobDone = new bool[this.generateMapsJobCount];
+        for (int i = 0; i < this.generateMapsJobCount; i++)
+        {
+            this.generateMapsJobDone[i] = true;
+            this.generateMapsJob[i] = new GenerateMapsJob() {
+                heightMap = new NativeArray<float>(256, Allocator.Persistent),
+                rainMap = new NativeArray<float>(256, Allocator.Persistent),
+                heatMap = new NativeArray<float>(256, Allocator.Persistent)
+            };
+        }
+
         // Generate Voxels Job
         this.generateVoxelsJob = new GenerateVoxelsJob[this.generateVoxelsJobCount];
         this.generateVoxelsJobHandle = new JobHandle[this.generateVoxelsJobCount];
@@ -209,8 +225,9 @@ public class World : MonoBehaviour
             this.generateVoxelsJobDone[i] = true;
             this.generateVoxelsJob[i] = new GenerateVoxelsJob() {
                 voxels = new NativeArray<Voxel>(65536, Allocator.Persistent),
-                heights = new NativeArray<float>(256, Allocator.Persistent),
-                tempHeights = new NativeArray<float>(324, Allocator.Persistent)
+                heightMap = new NativeArray<float>(256, Allocator.Persistent),
+                rainMap = new NativeArray<float>(256, Allocator.Persistent),
+                heatMap = new NativeArray<float>(256, Allocator.Persistent)
             };
         }
 
@@ -396,6 +413,14 @@ public class World : MonoBehaviour
             return;
         }
 
+        for (int i = 0; i < generateMapsJobCount; i++)
+        {
+            if (!this.generateMapsJobDone[i])
+            {
+                return;
+            }
+        }
+
         for (int i = 0; i < generateVoxelsJobCount; i++)
         {
             if (!this.generateVoxelsJobDone[i])
@@ -500,6 +525,7 @@ public class World : MonoBehaviour
 
             if (!this.chunks.ContainsKey(chunkPosition))
             {
+                this.generateMapsQueue.Enqueue(chunkPosition);
                 this.generateVoxelsQueue.Enqueue(chunkPosition);
 
                 if (this.IsInChunkDistance(chunkPosition, 1))
@@ -514,6 +540,11 @@ public class World : MonoBehaviour
             }
             else
             {
+                if (!this.chunks[chunkPosition].hasVoxels)
+                {
+                    this.generateVoxelsQueue.Enqueue(chunkPosition);
+                }
+
                 if (this.IsInChunkDistance(chunkPosition, 1) && !this.chunks[chunkPosition].hasLights)
                 {
                     this.generateLightsQueue.Enqueue(chunkPosition);
@@ -553,6 +584,59 @@ public class World : MonoBehaviour
     }
 
     //////////////////////////////////////////////////////////////////////////////
+    /// GENERATE MAPS ////////////////////////////////////////////////////////////
+    //////////////////////////////////////////////////////////////////////////////
+    
+    private void GenerateMaps()
+    {
+        this.GenerateMapsSchedule();
+        this.GenerateMapsComplete();
+    }
+
+    private void GenerateMapsSchedule()
+    {
+        if (this.isUpdateChunkQueuePending)
+        {
+            this.generateMapsQueue.Clear();
+            return;
+        }
+
+        for (int i = 0; (this.generateMapsQueue.Count > 0) && (i < this.generateMapsJobCount); i++)
+        {
+            if (this.generateMapsJobDone[i])
+            {
+                Vector2Int chunkPosition = this.generateMapsQueue.Dequeue();
+
+                this.generateMapsJob[i].chunkPosition = new int2(chunkPosition.x, chunkPosition.y);
+                this.generateMapsJobHandle[i] = this.generateMapsJob[i].Schedule();
+                this.generateMapsJobDone[i] = false;
+            }
+        }
+    }
+
+    private void GenerateMapsComplete()
+    {
+        for (int i = 0; i < this.generateMapsJobCount; i++)
+        {
+            if (!this.generateMapsJobDone[i] && this.generateMapsJobHandle[i].IsCompleted)
+            {
+                this.generateMapsJobHandle[i].Complete();
+                this.generateMapsJobDone[i] = true;
+
+                Chunk chunk = new Chunk();
+                chunk.SetHeightMapFromNative(this.generateMapsJob[i].heightMap);
+                chunk.SetRainMapFromNative(this.generateMapsJob[i].rainMap);
+                chunk.SetHeatMapFromNative(this.generateMapsJob[i].heatMap);
+                chunk.hasMaps = true;
+
+                Vector2Int chunkPosition = new Vector2Int(this.generateMapsJob[i].chunkPosition.x, this.generateMapsJob[i].chunkPosition.y);
+
+                this.chunks.Add(chunkPosition, chunk);
+            }
+        }
+    }
+
+    //////////////////////////////////////////////////////////////////////////////
     /// GENERATE VOXELS //////////////////////////////////////////////////////////
     //////////////////////////////////////////////////////////////////////////////
 
@@ -574,9 +658,19 @@ public class World : MonoBehaviour
         {
             if (this.generateVoxelsJobDone[i])
             {
-                Vector2Int chunkPosition = this.generateVoxelsQueue.Dequeue();
+                Vector2Int chunkPosition = this.generateVoxelsQueue.Peek();
+
+                if (!this.chunks.ContainsKey(chunkPosition))
+                {
+                    return;
+                }
+
+                this.generateVoxelsQueue.Dequeue();
 
                 this.generateVoxelsJob[i].chunkPosition = new int2(chunkPosition.x, chunkPosition.y);
+                this.generateVoxelsJob[i].heightMap.CopyFrom(this.chunks[chunkPosition].GetHeightMap());
+                this.generateVoxelsJob[i].rainMap.CopyFrom(this.chunks[chunkPosition].GetRainMap());
+                this.generateVoxelsJob[i].heatMap.CopyFrom(this.chunks[chunkPosition].GetHeatMap());
                 this.generateVoxelsJobHandle[i] = this.generateVoxelsJob[i].Schedule();
                 this.generateVoxelsJobDone[i] = false;
             }
@@ -592,12 +686,10 @@ public class World : MonoBehaviour
                 this.generateVoxelsJobHandle[i].Complete();
                 this.generateVoxelsJobDone[i] = true;
 
-                Chunk chunk = new Chunk();
-                chunk.SetVoxelsFromNative(this.generateVoxelsJob[i].voxels);
-                chunk.hasVoxels = true;
-
                 Vector2Int chunkPosition = new Vector2Int(this.generateVoxelsJob[i].chunkPosition.x, this.generateVoxelsJob[i].chunkPosition.y);
-                this.chunks.Add(chunkPosition, chunk);
+
+                this.chunks[chunkPosition].SetVoxelsFromNative(this.generateVoxelsJob[i].voxels);
+                this.chunks[chunkPosition].hasVoxels = true;
             }
         }
     }
@@ -898,13 +990,23 @@ public class World : MonoBehaviour
 
     private void DisposeJobs()
     {
+        // Generate Maps Job
+        for (int i = 0; i < this.generateMapsJobCount; i++)
+        {
+            if (!this.generateMapsJobDone[i]) this.generateMapsJobHandle[i].Complete();
+            this.generateMapsJob[i].heightMap.Dispose();
+            this.generateMapsJob[i].rainMap.Dispose();
+            this.generateMapsJob[i].heatMap.Dispose();
+        }
+
         // Generate Voxels Job
         for (int i = 0; i < this.generateVoxelsJobCount; i++)
         {
             if (!this.generateVoxelsJobDone[i]) this.generateVoxelsJobHandle[i].Complete();
             this.generateVoxelsJob[i].voxels.Dispose();
-            this.generateVoxelsJob[i].heights.Dispose();
-            this.generateVoxelsJob[i].tempHeights.Dispose();
+            this.generateVoxelsJob[i].heightMap.Dispose();
+            this.generateVoxelsJob[i].rainMap.Dispose();
+            this.generateVoxelsJob[i].heatMap.Dispose();
         }
 
         // Generate Lights Job

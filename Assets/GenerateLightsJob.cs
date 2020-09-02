@@ -6,7 +6,7 @@ using Unity.Collections;
 using Unity.Jobs;
 using Unity.Mathematics;
 
-[BurstCompile(CompileSynchronously = true)]
+[BurstCompile]
 public struct GenerateLightsJob : IJob
 {
     // Final light data output
@@ -40,9 +40,11 @@ public struct GenerateLightsJob : IJob
 
     public void SpreadSunLights()
     {
+        int count = 0;
         while (this.lightQueue.Count > 0)
         {
             this.SpreadSunLight(this.lightQueue.Dequeue());
+            count++;
         }
     }
 
