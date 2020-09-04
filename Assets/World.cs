@@ -13,7 +13,7 @@ public class World : MonoBehaviour
     public Material colliderMaterial;
 
     // World Settings
-    private int chunkDistance = 9;
+    private int chunkDistance = 14;
 
     // Player Information
     public GameObject playerGameObject;
@@ -36,25 +36,25 @@ public class World : MonoBehaviour
     private Dictionary<Vector2Int, ChunkObject> chunkObjects = new Dictionary<Vector2Int, ChunkObject>();
 
     // Generate Maps Job
-    private int generateMapsJobCount = 4;
+    private int generateMapsJobCount = 2;
     private GenerateMapsJob[] generateMapsJob;
     private JobHandle[] generateMapsJobHandle;
     private bool[] generateMapsJobDone;
 
     // Generate Voxels Job
-    private int generateVoxelsJobCount = 4;
+    private int generateVoxelsJobCount = 2;
     private GenerateVoxelsJob[] generateVoxelsJob;
     private JobHandle[] generateVoxelsJobHandle;
     private bool[] generateVoxelsJobDone;
 
     // Generate Lights Job
-    private int generateLightsJobCount = 4;
+    private int generateLightsJobCount = 2;
     private GenerateLightsJob[] generateLightsJob;
     private JobHandle[] generateLightsJobHandle;
     private bool[] generateLightsJobDone;
 
     // Generate Mesh Job
-    private int generateMeshJobCount = 6;
+    private int generateMeshJobCount = 3;
     private GenerateMeshJob[] generateMeshJob;
     private JobHandle[] generateMeshJobHandle;
     private bool[] generateMeshJobDone;
@@ -210,6 +210,7 @@ public class World : MonoBehaviour
         {
             this.generateMapsJobDone[i] = true;
             this.generateMapsJob[i] = new GenerateMapsJob() {
+                heightMapTemp = new NativeArray<float>(400, Allocator.Persistent),
                 heightMap = new NativeArray<float>(256, Allocator.Persistent),
                 rainMap = new NativeArray<float>(256, Allocator.Persistent),
                 heatMap = new NativeArray<float>(256, Allocator.Persistent)
@@ -994,6 +995,7 @@ public class World : MonoBehaviour
         for (int i = 0; i < this.generateMapsJobCount; i++)
         {
             if (!this.generateMapsJobDone[i]) this.generateMapsJobHandle[i].Complete();
+            this.generateMapsJob[i].heightMapTemp.Dispose();
             this.generateMapsJob[i].heightMap.Dispose();
             this.generateMapsJob[i].rainMap.Dispose();
             this.generateMapsJob[i].heatMap.Dispose();

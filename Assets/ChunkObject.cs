@@ -10,6 +10,7 @@ public class ChunkObject
     public GameObject[] colliderObjects;
     public Mesh rendererMesh;
     public Mesh[] colliderMeshes;
+    private bool[] hasCollider = new bool[16];
 
     private bool isActive;
 
@@ -18,17 +19,14 @@ public class ChunkObject
         this.isActive = true;
         this.wrapperObject = new GameObject();
         this.wrapperObject.transform.position = new Vector3(chunkPosition.x * 16.0f, 0.0f, chunkPosition.y * 16.0f);
-        this.wrapperObject.name = "Chunk Wrapper (" + chunkPosition.x.ToString() + ", " + chunkPosition.y.ToString() + ")";
         this.rendererObject = new GameObject();
         this.rendererObject.transform.SetParent(this.wrapperObject.transform);
-        this.rendererObject.name = "Chunk Renderer (" + chunkPosition.x.ToString() + ", " + chunkPosition.y.ToString() + ")";
         this.rendererObject.transform.localPosition = Vector3.zero;
-        //this.rendererObject.transform.position = new Vector3(chunkPosition.x * 16.0f, 0.0f, chunkPosition.y * 16.0f);
         this.rendererObject.AddComponent<MeshFilter>();
         this.rendererObject.AddComponent<MeshRenderer>();
         this.rendererObject.GetComponent<MeshRenderer>().material = material;
+        //this.rendererObject.GetComponent<MeshRenderer>().allowOcclusionWhenDynamic = false;
         this.rendererMesh = new Mesh();
-        this.rendererMesh.name = "Chunk Renderer Mesh (" + chunkPosition.x.ToString() + ", " + chunkPosition.y.ToString() + ")";
         this.rendererMesh.indexFormat = UnityEngine.Rendering.IndexFormat.UInt32;
         this.rendererObject.GetComponent<MeshFilter>().sharedMesh = this.rendererMesh;
 
@@ -36,17 +34,7 @@ public class ChunkObject
         this.colliderMeshes = new Mesh[16];
         for (int i = 0; i < 16; i++)
         {
-            this.colliderObjects[i] = new GameObject();
-            this.colliderObjects[i].transform.SetParent(this.wrapperObject.transform);
-            this.colliderObjects[i].tag = "Terrain";
-            this.colliderObjects[i].layer = 8;
-            this.colliderObjects[i].name = "Chunk Collider (" + chunkPosition.x.ToString() + ", " + i + ", " + chunkPosition.y.ToString() + ")";
-            //this.colliderObjects[i].transform.position = new Vector3(chunkPosition.x * 16.0f, i * 16.0f, chunkPosition.y * 16.0f);
-            this.colliderObjects[i].transform.localPosition = new Vector3(0.0f, i * 16.0f, 0.0f);
-            this.colliderObjects[i].SetActive(false);
-            this.colliderObjects[i].AddComponent<MeshCollider>();
-            this.colliderMeshes[i] = new Mesh();
-            this.colliderMeshes[i].name = "Chunk Collider Mesh (" + chunkPosition.x.ToString() + ", " + i + ", " + chunkPosition.y.ToString() + ")";
+            this.hasCollider[i] = false;
         }
     }
 
@@ -92,6 +80,19 @@ public class ChunkObject
     {
         //System.Diagnostics.Stopwatch stopwatch = new System.Diagnostics.Stopwatch();
         //stopwatch.Start();
+
+        if (!this.hasCollider[index])
+        {
+            this.hasCollider[index] = true;
+
+            this.colliderObjects[index] = new GameObject();
+            this.colliderObjects[index].transform.SetParent(this.wrapperObject.transform);
+            this.colliderObjects[index].tag = "Terrain";
+            this.colliderObjects[index].layer = 8;
+            this.colliderObjects[index].transform.localPosition = new Vector3(0.0f, index * 16.0f, 0.0f);
+            this.colliderObjects[index].AddComponent<MeshCollider>();
+            this.colliderMeshes[index] = new Mesh();
+        }
 
         this.colliderMeshes[index].Clear();
         this.colliderMeshes[index].SetVertices(vertices);

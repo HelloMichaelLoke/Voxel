@@ -11,16 +11,19 @@ public struct GenerateMapsJob : IJob
 {
     public int2 chunkPosition;
 
+    public NativeArray<float> heightMapTemp;
+
     public NativeArray<float> heightMap;
     public NativeArray<float> rainMap;
     public NativeArray<float> heatMap;
 
     public void Execute()
     {
-        int startPositionX = chunkPosition.x * 16;
-        int startPositionZ = chunkPosition.y * 16;
-        int endPositionX = startPositionX + 16;
-        int endPositionZ = startPositionZ + 16;
+        int startPositionX = chunkPosition.x * 16 - 2;
+        int endPositionX = startPositionX + 16 + 4;
+
+        int startPositionZ = chunkPosition.y * 16 - 2;
+        int endPositionZ = startPositionZ + 16 + 4;
 
         float2 currentPosition = new float2(0.0f, 0.0f);
 
@@ -32,7 +35,55 @@ public struct GenerateMapsJob : IJob
                 currentPosition.x = x;
                 currentPosition.y = z;
 
-                this.heightMap[index] = this.GetHeight(currentPosition);
+                this.heightMapTemp[index] = this.GetHeight(currentPosition);
+
+                index++;
+            }
+        }
+
+        index = 0;
+        int indexTemp = 0;
+        float finalHeight = 0.0f;
+
+        for (int z = 0; z < 20; z++)
+        {
+            for (int x = 0; x < 20; x++)
+            {
+                if (x >= 2 && x <= 17 && z >= 2 && z <= 17)
+                {
+                    finalHeight = 0.0f;
+
+                    for (int iZ = -2; iZ <= 2; iZ++)
+                    {
+                        for (int iX = -2; iX <= 2; iX++)
+                        {
+                            finalHeight += this.heightMapTemp[indexTemp + iX + iZ * 20];
+                        }
+                    }
+
+                    this.heightMap[index] = finalHeight / 25.0f;
+
+                    index++;
+                }
+
+                indexTemp++;
+            }
+        }
+
+        startPositionX = chunkPosition.x * 16;
+        startPositionZ = chunkPosition.y * 16;
+        endPositionX = startPositionX + 16;
+        endPositionZ = startPositionZ + 16;
+        currentPosition = new float2(0.0f, 0.0f);
+        index = 0;
+
+        for (int z = startPositionZ; z < endPositionZ; z++)
+        {
+            for (int x = startPositionX; x < endPositionX; x++)
+            {
+                currentPosition.x = x;
+                currentPosition.y = z;
+
                 this.rainMap[index] = this.GetRain(currentPosition);
                 this.heatMap[index] = this.GetHeat(currentPosition);
 
@@ -47,29 +98,24 @@ public struct GenerateMapsJob : IJob
 
     private float GetHeight(float2 position)
     {
-        position += new float2(10000.0f, -10000.0f);
-        position *= 0.001f;
+        position *= 1.0f;
 
         // DOMAIN WARPING 1
-        float2 p = position * 0.008f;
-        float2 q = new float2(fbm(p), fbm(p + new float2(5.2f, 1.3f)));
-        float2 r = new float2(fbm(p + 2.0f * q + new float2(1.7f, 9.2f)), fbm(p + 2.0f * q + new float2(8.3f, 2.8f)));
-        float dmNoise1 = snoise(p + 2.0f * r);
-
-        // DOMAIN WARPING 2
-        p = position * 0.01f;
-        q = new float2(fbm(p), fbm(p + new float2(1.2f, 1.3f)));
-        r = new float2(fbm(p + 2.0f * q + new float2(2.7f, 3.2f)), fbm(p + 2.0f * q + new float2(-2.3f, 6.8f)));
-        float dmNoise2 = snoise(p + 2.0f * r);
-
-        // DOMAIN WARPING 3
-        p = position * 0.03f;
-        q = new float2(fbm(p), fbm(p + new float2(1.2f, 1.3f)));
-        r = new float2(fbm(p + 2.0f * q + new float2(2.7f, 3.2f)), fbm(p + 2.0f * q + new float2(-2.3f, 6.8f)));
-        float dmNoise3 = snoise(p + 2.0f * r);
+        float frequency1 = 0.00003f;
+        int octaves1 = 12;
+        float2 p = position * frequency1;
+        float2 q = new float2(
+            fbm(p, octaves1),
+            fbm(p + new float2(0.2f, 0.3f), octaves1)
+        );
+        float2 r = new float2(
+            fbm(p + q + new float2(0.7f, 0.2f), octaves1),
+            fbm(p + q + new float2(0.3f, 0.8f), octaves1)
+        );
+        float dmNoise1 = snoise(p + r);
 
         // FINAL HEIGHT
-        float mixedNoises = 0.6f * dmNoise1 + 0.3f * dmNoise2 + 0.1f * dmNoise3;
+        float mixedNoises = dmNoise1;
         float height = mixedNoises;
 
         return 100.0f + height * 80.0f;
@@ -163,8 +209,8 @@ public struct GenerateMapsJob : IJob
         return sum / max;
     }
 
-    private float fbm(float2 position)
+    private float fbm(float2 position, int octaves)
     {
-        return onoise(position, 13);
+        return onoise(position, octaves);
     }
 }
