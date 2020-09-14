@@ -30,49 +30,71 @@ public struct GenerateVoxelsJob : IJob
         byte snow = 5;
 
         int i = 0;
-        int heightIndex = 0;
+        int mapIndex = 0;
         for (int y = startPosition.y; y <= endPosition.y; y++)
         {
-            heightIndex = 0;
+            mapIndex = 0;
 
             for (int z = startPosition.z; z <= endPosition.z; z++)
             {
                 for (int x = startPosition.x; x <= endPosition.x; x++)
                 {
-                    float height = heightMap[heightIndex];
+                    float height = heightMap[mapIndex];
+                    float rain = rainMap[mapIndex];
+                    float heat = heatMap[mapIndex];
 
                     float density = 0.0f;
                     byte material = 0;
-
-                    if (y < height)
+                   
+                    if (y < height - 10.0f)
                     {
                         density = -128.0f;
                         material = stone;
                     }
 
-                    if (y > height)
+                    if (y < height && y >= height - 10.0f)
                     {
-                        density = 127.0f;
-                        material = air;
-                    }
-
-                    if (y < height && y + 1.0f > height)
-                    {
-                        density = -127.0f * (height % 1.0f) - 1.0f;
-
-                        if (height < 80.0f)
+                        if (y + 1.0f > height)
                         {
-                            material = sand;
+                            density = -127.0f * (height % 1.0f) - 1.0f;
                         }
                         else
                         {
-                            material = grass;
+                            density = -128.0f;
+                        }
+
+                        if (height < 80.0f)
+                        {
+                            material = stone;
+                        }
+                        else
+                        {
+                            float randValue = noise.snoise(new float2(x, z) * 1.0f) * 0.5f + 1.0f;
+
+                            material = dirt;
+
+                            if (rain < 1.0f)
+                            {
+                                material = sand;
+                            }
+                            else
+                            {
+                                material = grass;
+                            }
                         }
                     }
 
-                    if (y > height && y - 1.0f < height)
+                    if (y > height)
                     {
-                        density = -127.0f * (height % 1.0f) - 1.0f + 128.0f;
+                        if (y - 1.0f < height)
+                        {
+                            density = -127.0f * (height % 1.0f) - 1.0f + 128.0f;
+                        }
+                        else
+                        {
+                            density = 127.0f;
+                        }
+
                         material = air;
                     }
 
@@ -105,7 +127,7 @@ public struct GenerateVoxelsJob : IJob
                     this.voxels[i] = new Voxel((sbyte)density, material);
 
                     i++;
-                    heightIndex++;
+                    mapIndex++;
                 }
             }
         }

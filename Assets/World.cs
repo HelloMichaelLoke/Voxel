@@ -1,4 +1,5 @@
-﻿using System.Collections;
+﻿using System;
+using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.Rendering;
@@ -13,7 +14,7 @@ public class World : MonoBehaviour
     public Material colliderMaterial;
 
     // World Settings
-    private int chunkDistance = 14;
+    private int chunkDistance = 12;
 
     // Player Information
     public GameObject playerGameObject;
@@ -54,7 +55,7 @@ public class World : MonoBehaviour
     private bool[] generateLightsJobDone;
 
     // Generate Mesh Job
-    private int generateMeshJobCount = 3;
+    private int generateMeshJobCount = 2;
     private GenerateMeshJob[] generateMeshJob;
     private JobHandle[] generateMeshJobHandle;
     private bool[] generateMeshJobDone;
@@ -172,7 +173,9 @@ public class World : MonoBehaviour
 
     private void InitMaterial()
     {
-        Texture2DArray texColor = new Texture2DArray(1024, 1024, 6, TextureFormat.RGBA32, true, false);
+        int textureSize = 1024;
+
+        Texture2DArray texColor = new Texture2DArray(textureSize, textureSize, 6, TextureFormat.RGBA32, true, false);
         texColor.filterMode = FilterMode.Trilinear;
         texColor.anisoLevel = 8;
         texColor.wrapMode = TextureWrapMode.Repeat;
@@ -184,7 +187,7 @@ public class World : MonoBehaviour
         }
         texColor.Apply();
 
-        Texture2DArray texHeight = new Texture2DArray(1024, 1024, 6, TextureFormat.RGBA32, true, false);
+        Texture2DArray texHeight = new Texture2DArray(textureSize, textureSize, 6, TextureFormat.RGBA32, true, false);
         texHeight.filterMode = FilterMode.Trilinear;
         texHeight.anisoLevel = 8;
         texHeight.wrapMode = TextureWrapMode.Repeat;
@@ -984,6 +987,10 @@ public class World : MonoBehaviour
             }
         }
     }
+
+    //////////////////////////////////////////////////////////////////////////////
+    /// WORLD EDIT ///////////////////////////////////////////////////////////////
+    //////////////////////////////////////////////////////////////////////////////
 
     //////////////////////////////////////////////////////////////////////////////
     /// CLEAN UP /////////////////////////////////////////////////////////////////

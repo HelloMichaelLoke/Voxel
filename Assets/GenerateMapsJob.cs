@@ -106,16 +106,16 @@ public struct GenerateMapsJob : IJob
         float2 p = position * frequency1;
         float2 q = new float2(
             fbm(p, octaves1),
-            fbm(p + new float2(0.2f, 0.3f), octaves1)
+            fbm(p + new float2(1.2f, 2.3f), octaves1)
         );
         float2 r = new float2(
-            fbm(p + q + new float2(0.7f, 0.2f), octaves1),
-            fbm(p + q + new float2(0.3f, 0.8f), octaves1)
+            fbm(p + q + new float2(-0.7f, 1.2f), octaves1),
+            fbm(p + q + new float2(0.8f, -0.8f), octaves1)
         );
         float dmNoise1 = snoise(p + r);
 
         // FINAL HEIGHT
-        float mixedNoises = dmNoise1;
+        float mixedNoises = 0.9f * dmNoise1 + 0.1f * this.fbm(position * 0.004f, 12);
         float height = mixedNoises;
 
         return 100.0f + height * 80.0f;
@@ -125,11 +125,22 @@ public struct GenerateMapsJob : IJob
     {
         float rain = 0.0f;
 
-        float2 offset = new float2(1000.0f, 1000.0f);
+        //float2 offset = new float2(1000.0f, 1000.0f);
+        //rain = noise.snoise(offset + (position * 0.001f));
+        //rain = 0.5f * rain + 0.5f;
 
-        rain = noise.snoise(offset + (position * 0.001f));
+        float2 p = position * 0.00001f;
+        float2 q = new float2(
+            fbm(p, 12),
+            fbm(p + new float2(1.1f, 0.3f), 12)
+        );
 
-        rain = 0.5f * rain + 0.5f;
+        float2 r = new float2(
+            fbm(p + q + new float2(0.8f, 1.1f), 12),
+            fbm(p + q + new float2(0.5f, 0.4f), 12)
+        );
+
+        rain = fbm(p + r, 12) + 1.0f;
 
         return rain;
     }
@@ -138,11 +149,22 @@ public struct GenerateMapsJob : IJob
     {
         float heat = 0.0f;
 
-        float2 offset = new float2(-1000.0f, -1000.0f);
+        //float2 offset = new float2(-1000.0f, -1000.0f);
+        //heat = noise.snoise(offset + (position * 0.001f));
+        //heat = 0.5f * heat + 0.5f;
 
-        heat = noise.snoise(offset + (position * 0.001f));
+        float2 p = position * 0.00001f + new float2(-1283.0f, 1138.0f);
+        float2 q = new float2(
+            fbm(p, 12),
+            fbm(p + new float2(2.1f, 0.7f), 12)
+        );
 
-        heat = 0.5f * heat + 0.5f;
+        float2 r = new float2(
+            fbm(p + q + new float2(1.8f, -1.4f), 12),
+            fbm(p + q + new float2(2.5f, -1.4f), 12)
+        );
+
+        heat = fbm(p + r, 12) + 1.0f;
 
         return heat;
     }
@@ -151,9 +173,9 @@ public struct GenerateMapsJob : IJob
     /// FUNCTIONS //////////////////////////////////////////////////////
     ////////////////////////////////////////////////////////////////////
 
-    private float3 permute(float3 h)
+    private float3 permute(float3 h, float hash = 2.0f)
     {
-        float3 value = (h * (h * 34.0f + 2.0f));
+        float3 value = (h * (h * 34.0f + hash));
         value.x = value.x % 289.0f;
         value.y = value.y % 289.0f;
         value.z = value.z % 289.0f;
@@ -178,7 +200,9 @@ public struct GenerateMapsJob : IJob
         float2 vertex1 = vSkewBase;
         float2 vertex2 = vSkewBase + p;
         float2 vertex3 = vSkewBase + new float2(1.0f, 1.0f);
-        float3 hashes = permute(permute(new float3(vertex1.x, vertex2.x, vertex3.x)) + new float3(vertex1.y, vertex2.y, vertex3.y));
+        float hashA = 1358.0f;
+        float hashB = 6183.0f;
+        float3 hashes = permute(permute(new float3(vertex1.x, vertex2.x, vertex3.x), hashA) + new float3(vertex1.y, vertex2.y, vertex3.y), hashB);
         hashes *= 6.283185307179586f / 289.0f;
 
         float unskew = (vSkewRelative.x + vSkewRelative.y) * C.y;
