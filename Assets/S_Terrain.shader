@@ -275,10 +275,10 @@
                     //float3 color = i.diff;
                     
                     // Voxel Light
-                    //float3 color = max(i.light.x, i.light.y) * float3(1.0, 1.0, 1.0);
+                    float3 color = max(i.light.x, i.light.y) * float3(1.0, 1.0, 1.0);
 
                     // Albedo with Light
-                    float3 color = (_TexBrightness + (1.0 - _TexBrightness) * light) * albedo;
+                    //float3 color = (_TexBrightness + (1.0 - _TexBrightness) * light) * albedo;
 
                     //float3 color = i.worldNormal;
                     //color = float3(1.0, 1.0, 1.0) * light;

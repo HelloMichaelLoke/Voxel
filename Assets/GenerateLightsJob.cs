@@ -6,7 +6,7 @@ using Unity.Collections;
 using Unity.Jobs;
 using Unity.Mathematics;
 
-[BurstCompile]
+[BurstCompile(CompileSynchronously = true)]
 public struct GenerateLightsJob : IJob
 {
     // Final light data output
@@ -40,11 +40,9 @@ public struct GenerateLightsJob : IJob
 
     public void SpreadSunLights()
     {
-        int count = 0;
         while (this.lightQueue.Count > 0)
         {
             this.SpreadSunLight(this.lightQueue.Dequeue());
-            count++;
         }
     }
 
@@ -177,58 +175,58 @@ public struct GenerateLightsJob : IJob
         bool isSolid;
         int index;
 
-        for (int y = 0; y <= 255; y++)
+        for (int y = 0; y < 256; y++)
         {
-            for (int z = 0; z <= 47; z++)
+            for (int z = 0; z < 48; z++)
             {
-                for (int x = 0; x <= 47; x++)
+                for (int x = 0; x < 48; x++)
                 {
                     isSolid = false;
 
                     if (x <= 15 && z <= 15)
                     {
                         index = x + (z * 16) + y * 256;
-                        if (voxels00[index].GetMaterial() > 0) isSolid = true;
+                        isSolid = voxels00[index].IsSolid();
                     }
                     else if (x >= 16 && x <= 31 && z <= 15)
                     {
                         index = (x - 16) + (z * 16) + y * 256;
-                        if (voxels10[index].GetMaterial() > 0) isSolid = true;
+                        isSolid = voxels10[index].IsSolid();
                     }
                     else if (x >= 32 && z <= 15)
                     {
                         index = (x - 32) + (z * 16) + y * 256;
-                        if (voxels20[index].GetMaterial() > 0) isSolid = true;
+                        isSolid = voxels20[index].IsSolid();
                     }
                     else if (x <= 15 && z >= 16 && z <= 31)
                     {
                         index = x + ((z - 16) * 16) + y * 256;
-                        if (voxels01[index].GetMaterial() > 0) isSolid = true;
+                        isSolid = voxels01[index].IsSolid();
                     }
                     else if (x >= 16 && x <= 31 && z >= 16 && z <= 31)
                     {
-                        index = x - 16 + ((z - 16) * 16) + y * 256;
-                        if (voxels11[index].GetMaterial() > 0) isSolid = true;
+                        index = (x - 16) + ((z - 16) * 16) + y * 256;
+                        isSolid = voxels11[index].IsSolid();
                     }
                     else if (x >= 32 && z >= 16 && z <= 31)
                     {
                         index = (x - 32) + ((z - 16) * 16) + y * 256;
-                        if (voxels21[index].GetMaterial() > 0) isSolid = true;
+                        isSolid = voxels21[index].IsSolid();
                     }
                     else if (x <= 15 && z >= 32)
                     {
                         index = x + ((z - 32) * 16) + y * 256;
-                        if (voxels02[index].GetMaterial() > 0) isSolid = true;
+                        isSolid = voxels02[index].IsSolid();
                     }
                     else if (x >= 16 && x <= 31 && z >= 32)
                     {
                         index = (x - 16) + ((z - 32) * 16) + y * 256;
-                        if (voxels12[index].GetMaterial() > 0) isSolid = true;
+                        isSolid = voxels12[index].IsSolid();
                     }
                     else if (x >= 32 && z >= 32)
                     {
                         index = (x - 32) + ((z - 32) * 16) + y * 256;
-                        if (voxels22[index].GetMaterial() > 0) isSolid = true;
+                        isSolid = voxels22[index].IsSolid();
                     }
 
                     if (y == 255)

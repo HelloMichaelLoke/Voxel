@@ -6,7 +6,7 @@ using Unity.Collections;
 using Unity.Jobs;
 using Unity.Mathematics;
 
-[BurstCompile]
+[BurstCompile(CompileSynchronously = true)]
 public struct GenerateMeshJob : IJob
 {
     // Temporary Data
@@ -330,10 +330,8 @@ public struct GenerateMeshJob : IJob
             if (density0 >= 0.0f) density0 += 1.0f;
             if (density1 >= 0.0f) density1 += 1.0f;
             distance = math.abs(density1 - density0);
-            density0 /= distance;
-            density1 /= distance;
 
-            weight0 = math.abs(density1);
+            weight0 = math.abs(density1 / distance);
             weight1 = 1.0f - weight0;
 
             // Vertex

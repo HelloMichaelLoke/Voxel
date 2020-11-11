@@ -736,6 +736,11 @@ public class World : MonoBehaviour
                         {
                             return;
                         }
+
+                        if (!this.chunks[neighborPosition].hasVoxels)
+                        {
+                            return;
+                        }
                     }
                 }
 

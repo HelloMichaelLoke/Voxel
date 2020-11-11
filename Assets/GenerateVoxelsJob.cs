@@ -6,7 +6,7 @@ using Unity.Collections;
 using Unity.Jobs;
 using Unity.Mathematics;
 
-[BurstCompile]
+[BurstCompile(CompileSynchronously = true)]
 public struct GenerateVoxelsJob : IJob
 {
     public NativeArray<float> heightMap;
@@ -82,6 +82,8 @@ public struct GenerateVoxelsJob : IJob
                                 material = grass;
                             }
                         }
+
+                        material = GetMaterial(new float3(x, y, z));
                     }
 
                     if (y > height)
@@ -98,19 +100,19 @@ public struct GenerateVoxelsJob : IJob
                         material = air;
                     }
 
-                    //if (y < height - 10.0f)
-                    //{
-                    //    if (this.GetCaves(new float3(x, y, z)) < 0.0f)
-                    //    {
-                    //        density = -128.0f;
-                    //        material = stone;
-                    //    }
-                    //    else
-                    //    {
-                    //        density = 127.0f;
-                    //        material = air;
-                    //    }
-                    //}
+                    if (y < height - 10.0f)
+                    {
+                        if (this.GetCaves(new float3(x, y, z)) < 0.0f)
+                        {
+                            density = -128.0f;
+                            material = stone;
+                        }
+                        else
+                        {
+                            density = 127.0f;
+                            material = air;
+                        }
+                    }
 
                     if (y <= 2)
                     {
@@ -149,7 +151,7 @@ public struct GenerateVoxelsJob : IJob
         // Noises
         float value = 0.0f;
 
-        float noiseAFreq = 0.05f;
+        float noiseAFreq = 0.02f;
         float noiseA = noise.snoise(position * noiseAFreq);
         value = noiseA;
 

@@ -6,7 +6,7 @@ using Unity.Collections;
 using Unity.Jobs;
 using Unity.Mathematics;
 
-[BurstCompile]
+[BurstCompile(CompileSynchronously = true)]
 public struct GenerateMapsJob : IJob
 {
     public int2 chunkPosition;
@@ -200,8 +200,8 @@ public struct GenerateMapsJob : IJob
         float2 vertex1 = vSkewBase;
         float2 vertex2 = vSkewBase + p;
         float2 vertex3 = vSkewBase + new float2(1.0f, 1.0f);
-        float hashA = 1358.0f;
-        float hashB = 6183.0f;
+        float hashA = 4358.0f;
+        float hashB = 2486.0f;
         float3 hashes = permute(permute(new float3(vertex1.x, vertex2.x, vertex3.x), hashA) + new float3(vertex1.y, vertex2.y, vertex3.y), hashB);
         hashes *= 6.283185307179586f / 289.0f;
 
