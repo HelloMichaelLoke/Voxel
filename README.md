@@ -2,6 +2,9 @@
 
 This is a repository for a Voxel Game in Unity.
 
+For any questions you can ask me on our Discord http://voxelgamedev.com
+My Discord name is Karasa#2381
+
 You can find an older video demo of the project here: https://www.youtube.com/watch?v=ZS3Z43MQaLw
 (It has changed a bit because I removed voxel editing again to rework the chunk generation)
 
